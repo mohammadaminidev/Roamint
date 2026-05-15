@@ -361,3 +361,13 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Roamint additions
+.env
+.env.*
+*.local.json
+appsettings.*.Local.json
+*.dump
+*.sql.gz
+.idea/
+.vscode/

@@ -1,1 +1,19 @@
-<Solution />
+<Solution>
+  <Folder Name="/src/Hosting/">
+    <Project Path="src/Hosting/Roamint.AppHost/Roamint.AppHost.csproj" />
+    <Project Path="src/Hosting/Roamint.ServiceDefaults/Roamint.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/README.md" />
+  </Folder>
+  <Folder Name="/docs/features/">
+    <File Path="docs/features/0001-solution-scaffold.md" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Bootstrap/">
+    <Project Path="src/Bootstrap/Roamint.Web/Roamint.Web.csproj" />
+  </Folder>
+</Solution>
