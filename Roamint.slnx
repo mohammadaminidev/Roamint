@@ -8,6 +8,7 @@
   </Folder>
   <Folder Name="/docs/features/">
     <File Path="docs/features/0001-solution-scaffold.md" />
+    <File Path="docs/features/0002-expenses-domain.md" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
@@ -15,5 +16,14 @@
   <Folder Name="/src/" />
   <Folder Name="/src/Bootstrap/">
     <Project Path="src/Bootstrap/Roamint.Web/Roamint.Web.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/Shared/Roamint.SharedKernel/Roamint.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Expenses/">
+    <Project Path="src/Modules/Expenses/Roamint.Expenses.Domain/Roamint.Expenses.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/Modules/Expenses/">
+    <Project Path="tests/Modules/Expenses/Roamint.Expenses.Domain.Tests/Roamint.Expenses.Domain.Tests.csproj" />
   </Folder>
 </Solution>
