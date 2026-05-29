@@ -13,13 +13,15 @@ Every feature, module, and architectural decision is captured here as a markdown
 
 ### Features
 
-| #    | Title                                                                       | Status   |
-|------|-----------------------------------------------------------------------------|----------|
-| 0001 | [Solution scaffold](features/0001-solution-scaffold.md)                     | Done     |
+| #    | Title                                                                       | Status      |
+|------|-----------------------------------------------------------------------------|-------------|
+| 0001 | [Solution scaffold](features/0001-solution-scaffold.md)                     | Done        |
+| 0002 | [Expenses module — domain layer](features/0002-expenses-domain.md)          | In progress |
 
 ### Modules
 
-_(Expenses, Wallet, Receipts, Insights — not yet started. Each will get a `features/NNNN-<module>-domain.md` design doc before any code lands.)_
+- **Expenses** — domain layer in progress; persistence + dispatcher + outbox slice next.
+- **Wallet, Receipts, Insights** — not yet started. Each will get a `features/NNNN-<module>-...md` design doc before any code lands.
 
 ### Architecture decisions
 
