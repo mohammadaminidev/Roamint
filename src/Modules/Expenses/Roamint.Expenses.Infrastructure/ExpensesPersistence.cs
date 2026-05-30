@@ -23,6 +23,8 @@ public static class ExpensesPersistence
         builder.Services.AddScoped<IExpenseRepository, ExpenseRepository>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        builder.Services.AddHostedService<ExpensesMigrationService>();
+
         return builder;
     }
 }

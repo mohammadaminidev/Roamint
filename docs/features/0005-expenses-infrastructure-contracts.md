@@ -1,6 +1,6 @@
 # 0005 — Expenses module: Infrastructure + Contracts
 
-**Status:** Proposed (awaiting approval — no code until then)
+**Status:** Done
 **Lands in:** `src/Modules/Expenses/Roamint.Expenses.Infrastructure/`,
 `src/Modules/Expenses/Roamint.Expenses.Contracts/`,
 `tests/Modules/Expenses/Roamint.Expenses.Infrastructure.Tests/`,
@@ -239,6 +239,28 @@ direct reference is needed.)
 6. `dotnet run --project src/Hosting/Roamint.AppHost --launch-profile http` — host boots, dashboard goes
    green, `expenses` schema + tables exist; resolving `IExpensesApi` and calling `RecordExpenseAsync`
    persists an expense and writes an outbox row.
+
+## Outcome (what actually shipped vs. the plan)
+
+- **`xmin` concurrency deferred.** Npgsql 10 removed `UseXminAsConcurrencyToken`, and the manual
+  `uint`/"xmin" mapping scaffolds an *invalid real column* (Postgres reserves `xmin`). Rather than ship a
+  fragile annotation hack, concurrency is left for a focused follow-up (single-user V1; revisit with the
+  add-expense form / phone-concurrency path). Still listed in Open questions.
+- **`IHasDomainEvents` added to the kernel.** The `SaveChanges` capture override needs to read events off
+  any aggregate without knowing its `TId`; `AggregateRoot<TId>` now implements a small non-generic
+  interface. (A second, expected Shared touch beyond the `TryAdd` tweak.)
+- **`ExpenseLine.UnitPrice` uses a single-column `MoneyConverter`,** not a complex mapping — EF's
+  `ComplexProperty` isn't available on owned-collection builders. `Expense.Amount` keeps the two-column
+  complex mapping (it's what the summary reads will group by). Lines are never queried by price, so the
+  packed `"amount|CODE"` column is acceptable.
+- **EF versions pinned** (`Microsoft.EntityFrameworkCore` + `.Relational` at 10.0.8) to stop the Npgsql
+  provider and Design tooling dragging in mismatched 10.0.x assemblies (MSB3277). `dotnet-ef` is a local
+  tool in `.config/dotnet-tools.json`. Scaffolded migrations carry a folder-scoped `.editorconfig`
+  (`generated_code = true`) so warnings-as-errors doesn't fail on generated style.
+- **Verification done deterministically, not via a manual Aspire boot.** `Roamint.Expenses.Contracts.Tests`
+  boots `AddExpensesModule` against Testcontainers using the `roamintdb` connection name and the dev
+  migration hosted service, then drives `IExpensesApi` end-to-end (persist + read-back via the repo port,
+  and `DomainException` propagation for archived-category / unknown-currency). 60 tests total, green.
 
 ## What's next
 

@@ -15,7 +15,7 @@ See [`docs/features/0001-solution-scaffold.md`](docs/features/0001-solution-scaf
 ### V1 roadmap — replace the Excel workflow
 
 - [x] Solution scaffold
-- [ ] Expenses module — domain (Expense, Category, Item, Budget) with strongly-typed IDs, outbox-backed events
+- [x] Expenses module — domain (Expense, Category) with strongly-typed IDs, EF Core persistence, outbox-backed events (capture done; drain lands with the first consumer)
 - [ ] Add-expense form — mobile-first, one-handed thumb input, item autocomplete, category suggestion
 - [ ] Expense list — filter by date range / category / currency
 - [ ] Monthly summary — per-category totals in AMD / USD / IRR (toman) with prior-month delta

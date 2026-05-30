@@ -26,6 +26,7 @@
   </Folder>
   <Folder Name="/src/Modules/Expenses/">
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Application/Roamint.Expenses.Application.csproj" />
+    <Project Path="src/Modules/Expenses/Roamint.Expenses.Contracts/Roamint.Expenses.Contracts.csproj" />
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Domain/Roamint.Expenses.Domain.csproj" />
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Infrastructure/Roamint.Expenses.Infrastructure.csproj" />
   </Folder>
@@ -34,6 +35,7 @@
   </Folder>
   <Folder Name="/tests/Modules/Expenses/">
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Application.Tests/Roamint.Expenses.Application.Tests.csproj" />
+    <Project Path="tests/Modules/Expenses/Roamint.Expenses.Contracts.Tests/Roamint.Expenses.Contracts.Tests.csproj" />
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Domain.Tests/Roamint.Expenses.Domain.Tests.csproj" />
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Infrastructure.Tests/Roamint.Expenses.Infrastructure.Tests.csproj" />
   </Folder>

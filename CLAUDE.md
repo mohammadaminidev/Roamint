@@ -25,7 +25,7 @@ Roamint is a single-tenant, multi-currency expense tracker built for personal da
   - `Domain` — aggregates, value objects, domain events; no infrastructure dependencies.
   - `Application` — command/query/event handlers, validators.
   - `Infrastructure` — EF Core mappings, Dapper queries, outbox processor, external clients.
-  - `Contracts` — public DTOs + the module's `AddXxxModule(IServiceCollection)` wiring extension.
+  - `Contracts` — public DTOs + the module's `AddXxxModule(IHostApplicationBuilder)` wiring extension (hangs off the builder so it can use Aspire's `AddNpgsqlDbContext`).
 - The web host only references each module's **`Contracts`** project, never its Domain/Application/Infrastructure.
 - **EF Core for writes, Dapper for reads** (especially analytics).
 
@@ -41,7 +41,7 @@ Roamint is a single-tenant, multi-currency expense tracker built for personal da
 
 | Module    | Status      | Notes                                                              |
 |-----------|-------------|--------------------------------------------------------------------|
-| Expenses  | In progress | Headline. Domain + Application done (0002/0004); Infra+Contracts next (0005). |
+| Expenses  | V1 in progress | Headline. Domain/Application/Infrastructure/Contracts done (0002/0004/0005). Outbox capture done; drain deferred until a consumer. Next: add-expense form. |
 | Wallet    | Not started | Plumbing. Wallets per currency + Exchange events as rate timeline. |
 | Receipts  | V2+         | OCR pipeline — out of V1.                                          |
 | Insights  | V2+         | Embeddings, NL queries — out of V1.                                |
@@ -130,7 +130,8 @@ Authoritative status lives in `docs/features/` (one doc per slice) and the READM
 - `0002` Expenses **Domain** — done (`src/Modules/Expenses/Roamint.Expenses.Domain`).
 - `0003` Dispatcher — done (`src/Shared`).
 - `0004` Expenses **Application** — done (`src/Modules/Expenses/Roamint.Expenses.Application`).
-- **Next**: `0005` Expenses **Infrastructure + Contracts** — EF Core `expenses.` schema mappings, concrete repositories/unit-of-work, transactional outbox, `AddExpensesModule` wiring. Design doc must be written and approved before any code lands.
+- `0005` Expenses **Infrastructure + Contracts** — done. EF Core `expenses.` schema, repositories/UoW, **outbox capture** (write-only; drain deferred until a consumer), `AddExpensesModule` wiring on `IHostApplicationBuilder`, dev-only startup migration. `IExpensesApi` is the host's only entry point. Strongly-typed IDs stay module-internal behind primitive DTOs. `xmin` optimistic concurrency deferred (Npgsql 10 dropped the helper). EF migrations use the `dotnet-ef` local tool (`.config/dotnet-tools.json`).
+- **Next**: add-expense Blazor form (V1 item 2) consuming `IExpensesApi`. Later: Dapper read models + outbox drain (with Wallet).
 
 ## Stop conditions
 

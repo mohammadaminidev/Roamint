@@ -1,8 +1,10 @@
+using Roamint.Expenses.Contracts;
 using Roamint.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+builder.AddExpensesModule();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

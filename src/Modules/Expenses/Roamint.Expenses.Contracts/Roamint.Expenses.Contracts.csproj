@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Roamint.Expenses.Application\Roamint.Expenses.Application.csproj" />
+    <ProjectReference Include="..\Roamint.Expenses.Infrastructure\Roamint.Expenses.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
