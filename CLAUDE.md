@@ -121,6 +121,12 @@ The README's V1 checklist is the authoritative status board; update it when a fe
 - **Aspire AppHost csproj uses both `Microsoft.NET.Sdk` and a nested `<Sdk Name="Aspire.AppHost.Sdk" Version="$(AspireAppHostSdkVersion)" />`.** The SDK version is held in `Directory.Packages.props` as the `AspireAppHostSdkVersion` MSBuild property — single source of truth.
 - **Forward slashes for paths in Bash on Windows.** `dotnet run --project src\Hosting\...` gets its backslashes consumed by shell escaping. Use `src/Hosting/...`.
 - **Aspire resource startup is async**, and per-resource logs stream to the dashboard, not AppHost stdout. To verify health programmatically, use `docker ps`, the resource service endpoint, or just click into the dashboard.
+- **EF Core 10 + Npgsql 10 persistence traps** (hit in 0005; will recur for Wallet):
+  - `ComplexProperty` works on `EntityTypeBuilder` but **not on owned-collection builders** (`OwnsMany`). Map value objects on owned entities with a `ValueConverter` instead (see `MoneyConverter`); keep the two-column complex mapping for aggregate-root value objects you need to query/group by.
+  - Npgsql 10 **removed `UseXminAsConcurrencyToken`**; the manual `Property<uint>("xmin")` form scaffolds an invalid real `xmin` column (Postgres reserves it). Optimistic concurrency is currently deferred.
+  - **Pin `Microsoft.EntityFrameworkCore` + `.Relational`** in `Directory.Packages.props`, or the Npgsql provider and Design tooling drag in mismatched 10.0.x assemblies → MSB3277.
+  - EF-scaffolded **migrations need a folder-scoped `.editorconfig` with `generated_code = true`**, else `IDE0161`/style rules fail the build under warnings-as-errors. `dotnet-ef` is a local tool (`.config/dotnet-tools.json`) — run via `dotnet dotnet-ef ...`.
+  - Each module's `AddXxxModule` registers its own handlers via `AddApplicationDispatcher`; the three dispatchers register idempotently (`TryAdd`), so the host stays ignorant of Application assemblies.
 
 ## Current state
 
