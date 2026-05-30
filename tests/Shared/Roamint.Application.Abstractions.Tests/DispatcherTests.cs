@@ -27,6 +27,20 @@ public sealed class DispatcherTests
     }
 
     [Fact]
+    public void Calling_twice_registers_each_dispatcher_once()
+    {
+        // Each module calls AddApplicationDispatcher with its own Application assembly, so the shared
+        // dispatcher registrations must be idempotent (TryAdd) to avoid duplicates.
+        var services = new ServiceCollection();
+        services.AddApplicationDispatcher(typeof(DispatcherTests).Assembly);
+        services.AddApplicationDispatcher(typeof(DispatcherTests).Assembly);
+
+        services.Count(d => d.ServiceType == typeof(ICommandDispatcher)).ShouldBe(1);
+        services.Count(d => d.ServiceType == typeof(IQueryDispatcher)).ShouldBe(1);
+        services.Count(d => d.ServiceType == typeof(IEventDispatcher)).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Void_command_routes_to_its_handler()
     {
         using var provider = BuildProvider();

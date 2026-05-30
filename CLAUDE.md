@@ -41,7 +41,7 @@ Roamint is a single-tenant, multi-currency expense tracker built for personal da
 
 | Module    | Status      | Notes                                                              |
 |-----------|-------------|--------------------------------------------------------------------|
-| Expenses  | Not started | Headline. Aggregates: Expense, Category, Item, Budget.             |
+| Expenses  | In progress | Headline. Domain + Application done (0002/0004); Infra+Contracts next (0005). |
 | Wallet    | Not started | Plumbing. Wallets per currency + Exchange events as rate timeline. |
 | Receipts  | V2+         | OCR pipeline — out of V1.                                          |
 | Insights  | V2+         | Embeddings, NL queries — out of V1.                                |
@@ -124,8 +124,13 @@ The README's V1 checklist is the authoritative status board; update it when a fe
 
 ## Current state
 
-- Solution scaffold complete. See [`docs/features/0001-solution-scaffold.md`](docs/features/0001-solution-scaffold.md).
-- **Next**: Expenses module design — domain model proposed in writing, no code in `src/Modules/Expenses/` until the user approves.
+Authoritative status lives in `docs/features/` (one doc per slice) and the README V1 checklist — trust those over this section, and keep this section in sync when a slice lands.
+
+- `0001` Solution scaffold — done.
+- `0002` Expenses **Domain** — done (`src/Modules/Expenses/Roamint.Expenses.Domain`).
+- `0003` Dispatcher — done (`src/Shared`).
+- `0004` Expenses **Application** — done (`src/Modules/Expenses/Roamint.Expenses.Application`).
+- **Next**: `0005` Expenses **Infrastructure + Contracts** — EF Core `expenses.` schema mappings, concrete repositories/unit-of-work, transactional outbox, `AddExpensesModule` wiring. Design doc must be written and approved before any code lands.
 
 ## Stop conditions
 

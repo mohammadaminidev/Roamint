@@ -4,7 +4,7 @@ namespace Roamint.SharedKernel;
 /// Base for aggregate roots. Buffers domain events raised during a unit of work; the persistence layer
 /// drains them (via <see cref="ClearDomainEvents"/>) and forwards them to the outbox after commit.
 /// </summary>
-public abstract class AggregateRoot<TId> : Entity<TId>
+public abstract class AggregateRoot<TId> : Entity<TId>, IHasDomainEvents
     where TId : struct, IEquatable<TId>
 {
     private readonly List<IDomainEvent> _domainEvents = [];

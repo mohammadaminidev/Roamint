@@ -11,6 +11,7 @@
     <File Path="docs/features/0002-expenses-domain.md" />
     <File Path="docs/features/0003-dispatcher.md" />
     <File Path="docs/features/0004-expenses-application.md" />
+    <File Path="docs/features/0005-expenses-infrastructure-contracts.md" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
@@ -26,6 +27,7 @@
   <Folder Name="/src/Modules/Expenses/">
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Application/Roamint.Expenses.Application.csproj" />
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Domain/Roamint.Expenses.Domain.csproj" />
+    <Project Path="src/Modules/Expenses/Roamint.Expenses.Infrastructure/Roamint.Expenses.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/Shared/">
     <Project Path="tests/Shared/Roamint.Application.Abstractions.Tests/Roamint.Application.Abstractions.Tests.csproj" />
@@ -33,5 +35,6 @@
   <Folder Name="/tests/Modules/Expenses/">
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Application.Tests/Roamint.Expenses.Application.Tests.csproj" />
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Domain.Tests/Roamint.Expenses.Domain.Tests.csproj" />
+    <Project Path="tests/Modules/Expenses/Roamint.Expenses.Infrastructure.Tests/Roamint.Expenses.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Roamint.Application.Abstractions.Internal;
 
 namespace Roamint.Application.Abstractions;
@@ -16,7 +17,8 @@ public static class DependencyInjection
 
     /// <summary>
     /// Registers the in-process dispatchers and scans <paramref name="handlerAssemblies"/> for command,
-    /// query, and integration-event handlers, registering each as scoped.
+    /// query, and integration-event handlers, registering each as scoped. Dispatcher registration is
+    /// idempotent, so each module may call this with its own Application assembly without duplicating them.
     /// </summary>
     public static IServiceCollection AddApplicationDispatcher(
         this IServiceCollection services,
@@ -25,9 +27,9 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(handlerAssemblies);
 
-        services.AddScoped<ICommandDispatcher, CommandDispatcher>();
-        services.AddScoped<IQueryDispatcher, QueryDispatcher>();
-        services.AddScoped<IEventDispatcher, EventDispatcher>();
+        services.TryAddScoped<ICommandDispatcher, CommandDispatcher>();
+        services.TryAddScoped<IQueryDispatcher, QueryDispatcher>();
+        services.TryAddScoped<IEventDispatcher, EventDispatcher>();
 
         foreach (var assembly in handlerAssemblies)
         {
