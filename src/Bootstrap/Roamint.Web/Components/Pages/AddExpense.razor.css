@@ -189,6 +189,134 @@ header {
     font-size: 0.86rem;
 }
 
+.amount-hint {
+    margin: 0 0 2px;
+    font-size: 0.74rem;
+}
+
+.line-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+}
+
+.line-head label {
+    margin-bottom: 0;
+}
+
+.add-line {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--accent);
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.line {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 8px;
+}
+
+.line-desc {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+.line-desc input {
+    width: 100%;
+}
+
+.line-qty {
+    width: 48px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.line-price {
+    width: 76px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.line input[type="text"] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 11px 11px;
+    color: var(--text);
+    font-size: 0.92rem;
+    outline: none;
+    font-family: inherit;
+}
+
+.line input:focus {
+    border-color: var(--accent);
+}
+
+.line-remove {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.line-remove:active {
+    background: var(--surface-2);
+}
+
+.note-wrap {
+    position: relative;
+}
+
+.suggest {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 4px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.suggest-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    padding: 10px 11px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.suggest-item:active {
+    background: var(--accent-soft);
+}
+
 .error {
     color: var(--danger);
     font-size: 0.86rem;

@@ -26,4 +26,26 @@ public sealed class ExpensesQueriesTests(ModuleHostFixture fixture)
         var afterArchive = await queries.ListActiveCategoriesAsync(Ct);
         afterArchive.ShouldNotContain(category => category.Id == categoryId);
     }
+
+    [Fact]
+    public async Task Suggests_a_recorded_item_and_its_category_through_the_wiring()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var api = scope.ServiceProvider.GetRequiredService<IExpensesApi>();
+        var queries = scope.ServiceProvider.GetRequiredService<IExpensesQueries>();
+
+        var token = $"Suggestable-{Guid.NewGuid():N}";
+        var categoryId = await api.CreateCategoryAsync(new CreateCategoryRequest($"{token} Cat"), Ct);
+        await api.RecordExpenseAsync(
+            new RecordExpenseRequest(categoryId, 4.50m, "USD", new DateOnly(2026, 4, 10), Note: token), Ct);
+
+        var suggestions = await queries.SuggestItemsAsync(token, 5, Ct);
+        suggestions.ShouldContain(s => s.Text == token && s.CategoryId == categoryId);
+
+        var suggested = await queries.SuggestCategoryAsync(token, Ct);
+        suggested.ShouldBe(categoryId);
+
+        var none = await queries.SuggestCategoryAsync($"absent-{Guid.NewGuid():N}", Ct);
+        none.ShouldBeNull();
+    }
 }

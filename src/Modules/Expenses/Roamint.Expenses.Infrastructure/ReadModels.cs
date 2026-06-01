@@ -27,3 +27,118 @@ internal sealed class ListActiveCategoriesHandler(ExpensesDbContext db)
         return rows.Select(row => new CategoryView(row.Id.Value, row.Name)).ToList();
     }
 }
+
+/// <summary>
+/// Autocomplete over item history. The corpus is the union of distinct notes and line descriptions;
+/// each suggestion carries the category last used with that text so the UI can fill the field and light
+/// the chip in one round trip. Filtering is an <c>ILIKE %text%</c> in SQL; prefix-vs-contains ranking,
+/// case-insensitive de-dupe, and recency ordering happen in memory over the small matched set (personal
+/// scale — a trigram index is a future concern, not built).
+/// </summary>
+internal sealed class SuggestItemsHandler(ExpensesDbContext db)
+    : IQueryHandler<SuggestItems, IReadOnlyList<ItemSuggestionView>>
+{
+    public async Task<IReadOnlyList<ItemSuggestionView>> HandleAsync(SuggestItems query, CancellationToken ct)
+    {
+        var text = query.Prefix.Trim();
+        if (text.Length == 0 || query.Limit <= 0)
+        {
+            return [];
+        }
+
+        var pattern = $"%{Like.Escape(text)}%";
+
+        var noteRows = await db.Expenses
+            .AsNoTracking()
+            .Where(expense => expense.Note != null && EF.Functions.ILike(expense.Note!, pattern, Like.EscapeChar))
+            .Select(expense => new Candidate(expense.Note!, expense.CategoryId, expense.OccurredOn, expense.Id))
+            .ToListAsync(ct);
+
+        var lineRows = await db.Expenses
+            .AsNoTracking()
+            .SelectMany(expense => expense.Lines
+                .Where(line => EF.Functions.ILike(line.Description, pattern, Like.EscapeChar))
+                .Select(line => new Candidate(line.Description, expense.CategoryId, expense.OccurredOn, expense.Id)))
+            .ToListAsync(ct);
+
+        return noteRows
+            .Concat(lineRows)
+            .GroupBy(candidate => candidate.Text, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var mostRecent = group
+                    .OrderByDescending(candidate => candidate.OccurredOn)
+                    .ThenByDescending(candidate => candidate.ExpenseId.Value)
+                    .First();
+                var isPrefix = mostRecent.Text.StartsWith(text, StringComparison.OrdinalIgnoreCase);
+                return (mostRecent, isPrefix);
+            })
+            .OrderByDescending(entry => entry.isPrefix)
+            .ThenByDescending(entry => entry.mostRecent.OccurredOn)
+            .ThenByDescending(entry => entry.mostRecent.ExpenseId.Value)
+            .Take(query.Limit)
+            .Select(entry => new ItemSuggestionView(entry.mostRecent.Text, entry.mostRecent.CategoryId.Value))
+            .ToList();
+    }
+
+    private readonly record struct Candidate(string Text, CategoryId CategoryId, DateOnly OccurredOn, ExpenseId ExpenseId);
+}
+
+/// <summary>
+/// Rule-based category guess. Gathers the distinct prior expenses whose note or any line description
+/// matches the item text, groups them by category, and returns the category whose most recent match is
+/// newest — frequency breaks same-date ties. Null when nothing matches.
+/// </summary>
+internal sealed class SuggestCategoryHandler(ExpensesDbContext db)
+    : IQueryHandler<SuggestCategory, Guid?>
+{
+    public async Task<Guid?> HandleAsync(SuggestCategory query, CancellationToken ct)
+    {
+        var text = query.ItemText.Trim();
+        if (text.Length == 0)
+        {
+            return null;
+        }
+
+        var pattern = $"%{Like.Escape(text)}%";
+
+        var matches = await db.Expenses
+            .AsNoTracking()
+            .Where(expense =>
+                (expense.Note != null && EF.Functions.ILike(expense.Note!, pattern, Like.EscapeChar))
+                || expense.Lines.Any(line => EF.Functions.ILike(line.Description, pattern, Like.EscapeChar)))
+            .Select(expense => new { expense.CategoryId, expense.OccurredOn, expense.Id })
+            .ToListAsync(ct);
+
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var best = matches
+            .GroupBy(match => match.CategoryId.Value)
+            .Select(group => new
+            {
+                CategoryId = group.Key,
+                MostRecent = group.Max(match => match.OccurredOn),
+                Frequency = group.Count(),
+            })
+            .OrderByDescending(category => category.MostRecent)
+            .ThenByDescending(category => category.Frequency)
+            .ThenByDescending(category => category.CategoryId)
+            .First();
+
+        return best.CategoryId;
+    }
+}
+
+/// <summary>SQL <c>LIKE</c>/<c>ILIKE</c> escaping for user-typed text, with an explicit escape char.</summary>
+file static class Like
+{
+    public const string EscapeChar = "\\";
+
+    public static string Escape(string value) => value
+        .Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("%", "\\%", StringComparison.Ordinal)
+        .Replace("_", "\\_", StringComparison.Ordinal);
+}
