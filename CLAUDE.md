@@ -41,7 +41,7 @@ Roamint is a single-tenant, multi-currency expense tracker built for personal da
 
 | Module    | Status      | Notes                                                              |
 |-----------|-------------|--------------------------------------------------------------------|
-| Expenses  | V1 in progress | Headline. Domain/Application/Infrastructure/Contracts done (0002/0004/0005). Outbox capture done; drain deferred until a consumer. Next: add-expense form. |
+| Expenses  | V1 in progress | Headline. Domain/Application/Infrastructure/Contracts done (0002/0004/0005). Add-expense form core + read seam done (0006). Outbox capture done; drain deferred until a consumer. Next (0007): line items, item autocomplete, category suggestion. |
 | Wallet    | Not started | Plumbing. Wallets per currency + Exchange events as rate timeline. |
 | Receipts  | V2+         | OCR pipeline — out of V1.                                          |
 | Insights  | V2+         | Embeddings, NL queries — out of V1.                                |
@@ -126,7 +126,8 @@ The README's V1 checklist is the authoritative status board; update it when a fe
   - Npgsql 10 **removed `UseXminAsConcurrencyToken`**; the manual `Property<uint>("xmin")` form scaffolds an invalid real `xmin` column (Postgres reserves it). Optimistic concurrency is currently deferred.
   - **Pin `Microsoft.EntityFrameworkCore` + `.Relational`** in `Directory.Packages.props`, or the Npgsql provider and Design tooling drag in mismatched 10.0.x assemblies → MSB3277.
   - EF-scaffolded **migrations need a folder-scoped `.editorconfig` with `generated_code = true`**, else `IDE0161`/style rules fail the build under warnings-as-errors. `dotnet-ef` is a local tool (`.config/dotnet-tools.json`) — run via `dotnet dotnet-ef ...`.
-  - Each module's `AddXxxModule` registers its own handlers via `AddApplicationDispatcher`; the three dispatchers register idempotently (`TryAdd`), so the host stays ignorant of Application assemblies.
+  - Each module's `AddXxxModule` registers its own handlers via `AddApplicationDispatcher`; the three dispatchers register idempotently (`TryAdd`), so the host stays ignorant of Application assemblies. `AddApplicationDispatcher` takes `params Assembly[]` — Expenses scans **both** Application (command/event handlers) and Infrastructure (read-model **query** handlers like `ListActiveCategoriesHandler`), since read models that bypass the aggregate belong in Infrastructure. Anchor the Infrastructure scan on the public `ExpensesPersistence` type (the `DbContext` is internal).
+- **Blazor scoped CSS needs an explicit bundle link.** `App.razor` must reference `@Assets["Roamint.Web.styles.css"]` (the scoped-CSS bundle) in addition to `app.css`, or `*.razor.css` styles silently don't load. Global theme (`:root` vars, `body`) lives in `app.css`; per-component layout lives in scoped `*.razor.css`.
 
 ## Current state
 
@@ -137,7 +138,8 @@ Authoritative status lives in `docs/features/` (one doc per slice) and the READM
 - `0003` Dispatcher — done (`src/Shared`).
 - `0004` Expenses **Application** — done (`src/Modules/Expenses/Roamint.Expenses.Application`).
 - `0005` Expenses **Infrastructure + Contracts** — done. EF Core `expenses.` schema, repositories/UoW, **outbox capture** (write-only; drain deferred until a consumer), `AddExpensesModule` wiring on `IHostApplicationBuilder`, dev-only startup migration. `IExpensesApi` is the host's only entry point. Strongly-typed IDs stay module-internal behind primitive DTOs. `xmin` optimistic concurrency deferred (Npgsql 10 dropped the helper). EF migrations use the `dotnet-ef` local tool (`.config/dotnet-tools.json`).
-- **Next**: add-expense Blazor form (V1 item 2) consuming `IExpensesApi`. Later: Dapper read models + outbox drain (with Wallet).
+- `0006` Expenses **add-expense form (core) + read seam** — done. `IExpensesQueries` (read API) alongside `IExpensesApi`; `ListActiveCategories` query handled by a **read model in Infrastructure** (`AsNoTracking`), dispatched via `AddApplicationDispatcher` now scanning both the Application **and** Infrastructure assemblies. Dev migration service seeds a starter category set on an empty DB. `/add` Blazor form (mobile-first, ported from `docs/prototypes/0006-add-expense-mock.html`): amount + currency (USD/AMD/USDT) + category chips + date + note → `RecordExpenseAsync`; `DomainException` surfaced as inline validation. Currency-aware decimal handling lives in the host as a UI concern (no SharedKernel reach beyond the documented `DomainException`).
+- **Next (0007)**: line items UI, item autocomplete, category suggestion (rule-based) — extends `IExpensesQueries`. Later: Dapper read models + outbox drain (with Wallet).
 
 ## Stop conditions
 

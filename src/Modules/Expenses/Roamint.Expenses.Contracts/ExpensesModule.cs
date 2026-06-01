@@ -14,8 +14,15 @@ public static class ExpensesModule
         ArgumentNullException.ThrowIfNull(builder);
 
         builder.AddExpensesPersistence();
-        builder.Services.AddApplicationDispatcher(typeof(CreateCategory).Assembly);
+
+        // Command/event handlers live in Application; read-model query handlers live in Infrastructure
+        // (e.g. ListActiveCategoriesHandler). Scan both — the dispatcher registers idempotently.
+        builder.Services.AddApplicationDispatcher(
+            typeof(CreateCategory).Assembly,
+            typeof(ExpensesPersistence).Assembly);
+
         builder.Services.AddScoped<IExpensesApi, ExpensesApi>();
+        builder.Services.AddScoped<IExpensesQueries, ExpensesQueries>();
 
         return builder;
     }

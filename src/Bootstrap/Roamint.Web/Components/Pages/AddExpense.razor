@@ -1,0 +1,190 @@
+@page "/add"
+@using System.Globalization
+@using Roamint.Expenses.Contracts
+@using Roamint.SharedKernel
+@inject IExpensesApi Api
+@inject IExpensesQueries Queries
+@inject TimeProvider Clock
+
+<PageTitle>Add expense · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Roamint
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="card">
+        <h2>New expense</h2>
+
+        <div class="amount-row">
+            <input class="amount-input" type="text" inputmode="decimal" placeholder="0"
+                   @bind="amountText" @bind:event="oninput" />
+            <div class="seg">
+                @foreach (var currency in Currencies)
+                {
+                    <button type="button" class="@(currency.Code == currencyCode ? "active" : null)"
+                            @onclick="() => SelectCurrency(currency.Code)">@currency.Code</button>
+                }
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+            <label>Category</label>
+            @if (categories is null)
+            {
+                <p class="hint">Loading…</p>
+            }
+            else if (categories.Count == 0)
+            {
+                <p class="hint">No categories yet — add one in category management.</p>
+            }
+            else
+            {
+                <div class="chips">
+                    @foreach (var category in categories)
+                    {
+                        <button type="button"
+                                class="chip @(category.Id == selectedCategoryId ? "active" : null)"
+                                @onclick="() => selectedCategoryId = category.Id">
+                            <span class="ic">@Icon(category.Name)</span> @category.Name
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="field">
+            <label>Date</label>
+            <input type="date" @bind="date" max="@today.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div class="field">
+            <label>Note (optional)</label>
+            <input type="text" placeholder="Lunch near the office" @bind="noteText" />
+        </div>
+
+        @if (error is not null)
+        {
+            <p class="error">@error</p>
+        }
+        @if (success is not null)
+        {
+            <p class="success">@success</p>
+        }
+    </div>
+
+    <button class="submit" type="button" disabled="@submitting" @onclick="Submit">
+        @(submitting ? "Saving…" : "Add expense")
+    </button>
+</div>
+
+@code {
+    private sealed record CurrencyOption(string Code, int Decimals);
+
+    // The transactable currencies the form offers. IRR is display-only (toman view, later) and not here.
+    private static readonly CurrencyOption[] Currencies =
+    [
+        new("USD", 2),
+        new("AMD", 0),
+        new("USDT", 2),
+    ];
+
+    private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Food"] = "🍽️",
+        ["Transport"] = "🚕",
+        ["Rent"] = "🏠",
+        ["Groceries"] = "🛒",
+        ["Utilities"] = "⚡",
+    };
+
+    private IReadOnlyList<CategoryListItem>? categories;
+    private Guid? selectedCategoryId;
+    private string currencyCode = "AMD";
+    private string amountText = string.Empty;
+    private DateOnly date;
+    private DateOnly today;
+    private string? noteText;
+    private bool submitting;
+    private string? error;
+    private string? success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
+        date = today;
+        categories = await Queries.ListActiveCategoriesAsync();
+        selectedCategoryId = categories.Count > 0 ? categories[0].Id : null;
+    }
+
+    private void SelectCurrency(string code)
+    {
+        currencyCode = code;
+        error = null;
+    }
+
+    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
+
+    private async Task Submit()
+    {
+        error = null;
+        success = null;
+
+        if (selectedCategoryId is null)
+        {
+            error = "Pick a category.";
+            return;
+        }
+
+        if (!TryParseAmount(out var amount))
+        {
+            error = "Enter a valid amount greater than zero.";
+            return;
+        }
+
+        if (date > today)
+        {
+            error = "The date can't be in the future.";
+            return;
+        }
+
+        submitting = true;
+        try
+        {
+            var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
+            await Api.RecordExpenseAsync(
+                new RecordExpenseRequest(selectedCategoryId.Value, amount, currencyCode, date, note));
+
+            success = $"Recorded {amount} {currencyCode}.";
+            amountText = string.Empty;
+            noteText = null;
+        }
+        catch (DomainException ex)
+        {
+            // Backstop for races the client checks can't catch (e.g. category archived between load and submit).
+            error = ex.Message;
+        }
+        finally
+        {
+            submitting = false;
+        }
+    }
+
+    private bool TryParseAmount(out decimal amount)
+    {
+        amount = 0m;
+        if (!decimal.TryParse(amountText, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+        {
+            return false;
+        }
+
+        var decimals = Currencies.First(currency => currency.Code == currencyCode).Decimals;
+        amount = Math.Round(parsed, decimals, MidpointRounding.AwayFromZero);
+        return amount > 0m;
+    }
+}

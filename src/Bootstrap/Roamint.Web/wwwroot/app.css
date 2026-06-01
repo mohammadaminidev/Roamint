@@ -1,1 +1,35 @@
-/* Roamint placeholder stylesheet. Real styles arrive with the V1 expense form. */
+/* Global theme for Roamint. Component layout lives in scoped *.razor.css files. */
+
+:root {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --surface-2: #1f242d;
+  --border: #2a313c;
+  --text: #e8eaed;
+  --muted: #9aa3b2;
+  --accent: #5b8cff;
+  --accent-soft: #1e2a47;
+  --usd: #34c759;
+  --amd: #ff9f0a;
+  --usdt: #26a17b;
+  --danger: #ff453a;
+  --ok: #34c759;
+  --radius: 14px;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
