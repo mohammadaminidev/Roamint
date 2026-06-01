@@ -12,6 +12,9 @@ public sealed class SuggestCategoryHandlerTests(PostgresFixture fixture)
 
     private static FakeTimeProvider Clock() => new(new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero));
 
+    private static ExpenseLineDraft Draft(string description, CategoryId category) =>
+        new(description, category, Money.Of(2m, Usd));
+
     [Fact]
     public async Task Returns_the_most_recently_used_category_among_matches()
     {
@@ -25,13 +28,10 @@ public sealed class SuggestCategoryHandlerTests(PostgresFixture fixture)
             db.Categories.Add(Category.Create(older, $"{tag} Older"));
             db.Categories.Add(Category.Create(newer, $"{tag} Newer"));
 
-            // Matches via the note; the later expense's category should win.
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), older, Money.Of(2m, Usd), new DateOnly(2026, 4, 1), clock, note: $"{tag} latte"));
-            // Matches via a line description rather than the note — still counts.
+                ExpenseId.New(clock), new DateOnly(2026, 4, 1), [Draft($"{tag} latte", older)], clock));
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), newer, Money.Of(2m, Usd), new DateOnly(2026, 4, 15), clock,
-                lines: [new ExpenseLineDraft($"{tag} latte", 1m, Money.Of(2m, Usd))]));
+                ExpenseId.New(clock), new DateOnly(2026, 4, 15), [Draft($"{tag} latte", newer)], clock));
 
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
@@ -60,11 +60,11 @@ public sealed class SuggestCategoryHandlerTests(PostgresFixture fixture)
             db.Categories.Add(Category.Create(common, $"{tag} Common"));
 
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), rare, Money.Of(1m, Usd), sameDate, clock, note: $"{tag} kebab"));
+                ExpenseId.New(clock), sameDate, [Draft($"{tag} kebab", rare)], clock));
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), common, Money.Of(1m, Usd), sameDate, clock, note: $"{tag} kebab"));
+                ExpenseId.New(clock), sameDate, [Draft($"{tag} kebab", common)], clock));
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), common, Money.Of(1m, Usd), sameDate, clock, note: $"{tag} kebab"));
+                ExpenseId.New(clock), sameDate, [Draft($"{tag} kebab", common)], clock));
 
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }

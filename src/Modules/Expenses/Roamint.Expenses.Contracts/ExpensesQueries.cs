@@ -16,7 +16,9 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
     public async Task<IReadOnlyList<ItemSuggestion>> SuggestItemsAsync(string prefix, int limit, CancellationToken ct = default)
     {
         var suggestions = await queries.QueryAsync(new SuggestItems(prefix, limit), ct);
-        return suggestions.Select(suggestion => new ItemSuggestion(suggestion.Text, suggestion.CategoryId)).ToList();
+        return suggestions
+            .Select(suggestion => new ItemSuggestion(suggestion.Text, suggestion.CategoryId, suggestion.Unit))
+            .ToList();
     }
 
     public Task<Guid?> SuggestCategoryAsync(string itemText, CancellationToken ct = default) =>

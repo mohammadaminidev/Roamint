@@ -3,14 +3,22 @@ using Roamint.SharedKernel;
 namespace Roamint.Expenses.Domain;
 
 /// <summary>Input shape for a line item; the aggregate turns it into an owned <see cref="ExpenseLine"/>.</summary>
-public sealed record ExpenseLineDraft(string Description, decimal Quantity, Money UnitPrice);
+public sealed record ExpenseLineDraft(string Description, CategoryId CategoryId, Money Amount, Quantity? Quantity = null);
 
-/// <summary>A line item owned by an <see cref="Expense"/>.</summary>
+/// <summary>
+/// A line item owned by an <see cref="Expense"/>. The item is the categorized unit: it carries its own
+/// category and the amount paid for it. Quantity is optional reportable annotation, never a multiplier.
+/// </summary>
 public sealed class ExpenseLine : Entity<ExpenseLineId>
 {
     public const int MaxDescriptionLength = 200;
 
-    internal ExpenseLine(ExpenseLineId id, string description, decimal quantity, Money unitPrice) : base(id)
+    // EF / serialization constructor; not for domain use. EF binds the key here and sets the mapped
+    // members (which include the complex Amount and owned Quantity) through their backing fields.
+    private ExpenseLine(ExpenseLineId id) : base(id) { }
+
+    internal ExpenseLine(ExpenseLineId id, string description, CategoryId categoryId, Money amount, Quantity? quantity)
+        : base(id)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
         var clean = description.Trim();
@@ -19,33 +27,31 @@ public sealed class ExpenseLine : Entity<ExpenseLineId>
             throw new DomainException($"Line description must be {MaxDescriptionLength} characters or fewer.");
         }
 
-        if (quantity <= 0m)
+        if (!amount.IsPositive)
         {
-            throw new DomainException("Line quantity must be greater than zero.");
-        }
-
-        if (!unitPrice.IsPositive)
-        {
-            throw new DomainException("Line unit price must be greater than zero.");
+            throw new DomainException("Line amount must be greater than zero.");
         }
 
         Description = clean;
+        CategoryId = categoryId;
+        Amount = amount;
         Quantity = quantity;
-        UnitPrice = unitPrice;
     }
 
-    public string Description { get; }
+    public string Description { get; } = string.Empty;
 
-    public decimal Quantity { get; }
+    public CategoryId CategoryId { get; }
 
-    public Money UnitPrice { get; }
+    /// <summary>The amount paid for this item, in the expense's currency.</summary>
+    public Money Amount { get; }
 
-    public Money LineTotal => UnitPrice * Quantity;
+    public Quantity? Quantity { get; }
 }
 
 /// <summary>
-/// A recorded expense in a single currency. FX equivalents are a read concern driven by the Wallet rate
-/// timeline and are never stored here.
+/// A recorded payment in a single currency — a shopping trip made of one or more categorized line items.
+/// The total and currency are derived from the lines; FX equivalents are a read concern driven by the
+/// Wallet rate timeline and are never stored here.
 /// </summary>
 public sealed class Expense : AggregateRoot<ExpenseId>
 {
@@ -54,24 +60,12 @@ public sealed class Expense : AggregateRoot<ExpenseId>
     // EF / serialization constructor; not for domain use.
     private Expense(ExpenseId id) : base(id) { }
 
-    private Expense(
-        ExpenseId id,
-        CategoryId categoryId,
-        Money amount,
-        DateOnly occurredOn,
-        string? note,
-        List<ExpenseLine> lines) : base(id)
+    private Expense(ExpenseId id, DateOnly occurredOn, string? note, List<ExpenseLine> lines) : base(id)
     {
-        CategoryId = categoryId;
-        Amount = amount;
         OccurredOn = occurredOn;
         Note = note;
         _lines = lines;
     }
-
-    public CategoryId CategoryId { get; private set; }
-
-    public Money Amount { get; private set; }
 
     public DateOnly OccurredOn { get; private set; }
 
@@ -79,100 +73,76 @@ public sealed class Expense : AggregateRoot<ExpenseId>
 
     public IReadOnlyList<ExpenseLine> Lines => _lines.AsReadOnly();
 
+    /// <summary>The currency of the payment, inherited by every line. Derived from the lines.</summary>
+    public Currency Currency => _lines[0].Amount.Currency;
+
+    /// <summary>The total paid, derived as the sum of line amounts.</summary>
+    public Money Total => _lines.Aggregate(Money.Zero(Currency), static (sum, line) => sum + line.Amount);
+
     public static Expense Record(
         ExpenseId id,
-        CategoryId categoryId,
-        Money amount,
         DateOnly occurredOn,
+        IEnumerable<ExpenseLineDraft> lines,
         TimeProvider clock,
-        string? note = null,
-        IEnumerable<ExpenseLineDraft>? lines = null)
+        string? note = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
-        EnsurePositive(amount);
+        ArgumentNullException.ThrowIfNull(lines);
         EnsureNotFuture(occurredOn, clock);
 
-        var builtLines = BuildLines(lines, amount, clock);
-        var expense = new Expense(id, categoryId, amount, occurredOn, Clean(note), builtLines);
-        expense.Raise(new ExpenseRecorded(id, categoryId, amount, occurredOn));
+        var builtLines = BuildLines(lines, clock);
+        var expense = new Expense(id, occurredOn, Clean(note), builtLines);
+        expense.Raise(new ExpenseRecorded(id, expense.Total, occurredOn));
         return expense;
     }
 
-    public void Recategorize(CategoryId categoryId)
-    {
-        if (categoryId == CategoryId)
-        {
-            return;
-        }
-
-        var previous = CategoryId;
-        CategoryId = categoryId;
-        Raise(new ExpenseRecategorized(Id, previous, categoryId));
-    }
-
     public void Correct(
-        Money amount,
         DateOnly occurredOn,
+        IEnumerable<ExpenseLineDraft> lines,
         TimeProvider clock,
-        string? note = null,
-        IEnumerable<ExpenseLineDraft>? lines = null)
+        string? note = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
-        EnsurePositive(amount);
+        ArgumentNullException.ThrowIfNull(lines);
         EnsureNotFuture(occurredOn, clock);
 
-        var builtLines = BuildLines(lines, amount, clock);
-        Amount = amount;
-        OccurredOn = occurredOn;
-        Note = Clean(note);
+        var builtLines = BuildLines(lines, clock);
         _lines.Clear();
         _lines.AddRange(builtLines);
-        Raise(new ExpenseCorrected(Id, amount, occurredOn));
+        OccurredOn = occurredOn;
+        Note = Clean(note);
+        Raise(new ExpenseCorrected(Id, Total, occurredOn));
     }
 
-    private static List<ExpenseLine> BuildLines(
-        IEnumerable<ExpenseLineDraft>? drafts,
-        Money amount,
-        TimeProvider clock)
+    private static List<ExpenseLine> BuildLines(IEnumerable<ExpenseLineDraft> drafts, TimeProvider clock)
     {
         var lines = new List<ExpenseLine>();
-        if (drafts is null)
-        {
-            return lines;
-        }
-
         foreach (var draft in drafts)
         {
-            if (draft.UnitPrice.Currency != amount.Currency)
-            {
-                throw new DomainException(
-                    $"Line currency {draft.UnitPrice.Currency.Code} does not match expense currency {amount.Currency.Code}.");
-            }
-
-            lines.Add(new ExpenseLine(ExpenseLineId.New(clock), draft.Description, draft.Quantity, draft.UnitPrice));
+            lines.Add(new ExpenseLine(
+                ExpenseLineId.New(clock),
+                draft.Description,
+                draft.CategoryId,
+                draft.Amount,
+                draft.Quantity));
         }
 
         if (lines.Count == 0)
         {
-            return lines;
+            throw new DomainException("An expense must have at least one line item.");
         }
 
-        var total = lines.Aggregate(Money.Zero(amount.Currency), (sum, line) => sum + line.LineTotal);
-        if (total != amount)
+        var currency = lines[0].Amount.Currency;
+        foreach (var line in lines)
         {
-            throw new DomainException(
-                $"Line items total {total} does not equal the expense amount {amount}.");
+            if (line.Amount.Currency != currency)
+            {
+                throw new DomainException(
+                    $"Line currency {line.Amount.Currency.Code} does not match expense currency {currency.Code}.");
+            }
         }
 
         return lines;
-    }
-
-    private static void EnsurePositive(Money amount)
-    {
-        if (!amount.IsPositive)
-        {
-            throw new DomainException("Expense amount must be greater than zero.");
-        }
     }
 
     private static void EnsureNotFuture(DateOnly occurredOn, TimeProvider clock)

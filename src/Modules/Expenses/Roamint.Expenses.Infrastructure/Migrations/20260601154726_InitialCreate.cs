@@ -34,11 +34,8 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    category_id = table.Column<Guid>(type: "uuid", nullable: false),
                     occurred_on = table.Column<DateOnly>(type: "date", nullable: false),
-                    note = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    amount = table.Column<decimal>(type: "numeric(19,4)", precision: 19, scale: 4, nullable: false),
-                    currency = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false)
+                    note = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -68,9 +65,12 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     description = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    quantity = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    unit_price = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
-                    expense_id = table.Column<Guid>(type: "uuid", nullable: false)
+                    category_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    quantity_value = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
+                    quantity_unit = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: true),
+                    expense_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    amount = table.Column<decimal>(type: "numeric(19,4)", precision: 19, scale: 4, nullable: false),
+                    currency = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false)
                 },
                 constraints: table =>
                 {

@@ -37,10 +37,11 @@ public sealed class ExpensesQueriesTests(ModuleHostFixture fixture)
         var token = $"Suggestable-{Guid.NewGuid():N}";
         var categoryId = await api.CreateCategoryAsync(new CreateCategoryRequest($"{token} Cat"), Ct);
         await api.RecordExpenseAsync(
-            new RecordExpenseRequest(categoryId, 4.50m, "USD", new DateOnly(2026, 4, 10), Note: token), Ct);
+            new RecordExpenseRequest("USD", new DateOnly(2026, 4, 10),
+                [new ExpenseLineDto(token, categoryId, 4.50m, QuantityValue: 250m, QuantityUnit: "ml")]), Ct);
 
         var suggestions = await queries.SuggestItemsAsync(token, 5, Ct);
-        suggestions.ShouldContain(s => s.Text == token && s.CategoryId == categoryId);
+        suggestions.ShouldContain(s => s.Text == token && s.CategoryId == categoryId && s.Unit == "ml");
 
         var suggested = await queries.SuggestCategoryAsync(token, Ct);
         suggested.ShouldBe(categoryId);

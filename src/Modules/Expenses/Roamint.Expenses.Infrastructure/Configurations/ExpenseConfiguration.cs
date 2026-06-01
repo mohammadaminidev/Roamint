@@ -14,48 +14,66 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.HasKey(expense => expense.Id);
         builder.Property(expense => expense.Id).HasColumnName("id");
 
-        builder.Property(expense => expense.CategoryId).HasColumnName("category_id").IsRequired();
         builder.Property(expense => expense.OccurredOn).HasColumnName("occurred_on").IsRequired();
         builder.Property(expense => expense.Note).HasColumnName("note").HasMaxLength(1000);
 
-        builder.ComplexProperty(expense => expense.Amount, MapMoney("amount", "currency"));
+        // Currency and Total are derived from the lines; never persisted on the expense.
+        builder.Ignore(expense => expense.Currency);
+        builder.Ignore(expense => expense.Total);
 
-        builder.OwnsMany(expense => expense.Lines, line =>
-        {
-            line.ToTable("expense_lines");
-            line.WithOwner().HasForeignKey("expense_id");
-
-            line.HasKey(item => item.Id);
-            line.Property(item => item.Id).HasColumnName("id");
-
-            line.Property(item => item.Description)
-                .HasColumnName("description")
-                .HasMaxLength(ExpenseLine.MaxDescriptionLength)
-                .IsRequired();
-
-            line.Property(item => item.Quantity).HasColumnName("quantity").HasPrecision(18, 4);
-
-            // ComplexProperty is unavailable on owned-collection builders, so the line price uses a
-            // single-column converter. Lines are aggregate-internal and never queried by price.
-            line.Property(item => item.UnitPrice)
-                .HasColumnName("unit_price")
-                .HasConversion(new MoneyConverter())
-                .HasMaxLength(40)
-                .IsRequired();
-        });
+        // Lines are a regular child entity (not owned) so the line's Money can use the two-column
+        // ComplexProperty mapping — see ExpenseLineConfiguration and 0008 D4b.
+        builder.HasMany(expense => expense.Lines)
+            .WithOne()
+            .HasForeignKey("expense_id")
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.Navigation(expense => expense.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(expense => expense.DomainEvents);
     }
+}
 
-    private static Action<ComplexPropertyBuilder<Money>> MapMoney(string amountColumn, string currencyColumn) =>
-        money =>
+internal sealed class ExpenseLineConfiguration : IEntityTypeConfiguration<ExpenseLine>
+{
+    public void Configure(EntityTypeBuilder<ExpenseLine> builder)
+    {
+        builder.ToTable("expense_lines");
+
+        builder.HasKey(line => line.Id);
+        builder.Property(line => line.Id).HasColumnName("id");
+
+        builder.Property(line => line.Description)
+            .HasColumnName("description")
+            .HasMaxLength(ExpenseLine.MaxDescriptionLength)
+            .IsRequired();
+
+        // Plain converted column, no DB foreign key — the same id-reference convention the expense used
+        // for its category before 0008. Referential integrity is held by the app (categories are archived,
+        // never deleted) and the validating handler.
+        builder.Property(line => line.CategoryId).HasColumnName("category_id").IsRequired();
+
+        // Two-column money mapping so category spend can SUM amounts in SQL.
+        builder.ComplexProperty(line => line.Amount, money =>
         {
-            money.Property(value => value.Amount).HasColumnName(amountColumn).HasPrecision(19, 4);
+            money.Property(value => value.Amount).HasColumnName("amount").HasPrecision(19, 4);
             money.Property(value => value.Currency)
-                .HasColumnName(currencyColumn)
+                .HasColumnName("currency")
                 .HasMaxLength(8)
                 .HasConversion(currency => currency.Code, code => Currency.FromCode(code));
-        };
+        });
+
+        // Optional owned quantity → two queryable columns (value numeric, unit as canonical code).
+        builder.OwnsOne(line => line.Quantity, quantity =>
+        {
+            quantity.Property(value => value.Value).HasColumnName("quantity_value").HasPrecision(18, 4);
+            quantity.Property(value => value.Unit)
+                .HasColumnName("quantity_unit")
+                .HasMaxLength(8)
+                .HasConversion(new QuantityUnitConverter());
+        });
+
+        builder.Navigation(line => line.Quantity).IsRequired(false);
+    }
 }

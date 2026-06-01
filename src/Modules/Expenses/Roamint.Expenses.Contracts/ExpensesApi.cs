@@ -28,18 +28,13 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
         ArgumentNullException.ThrowIfNull(request);
         var id = await commands.SendAsync(
             new RecordExpense(
-                new CategoryId(request.CategoryId),
-                request.Amount,
                 request.CurrencyCode,
                 request.OccurredOn,
-                request.Note,
-                ToLines(request.Lines)),
+                ToLines(request.Lines),
+                request.Note),
             ct);
         return id.Value;
     }
-
-    public Task RecategorizeExpenseAsync(Guid expenseId, Guid categoryId, CancellationToken ct = default) =>
-        commands.SendAsync(new RecategorizeExpense(new ExpenseId(expenseId), new CategoryId(categoryId)), ct);
 
     public Task CorrectExpenseAsync(Guid expenseId, CorrectExpenseRequest request, CancellationToken ct = default)
     {
@@ -47,14 +42,21 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
         return commands.SendAsync(
             new CorrectExpense(
                 new ExpenseId(expenseId),
-                request.Amount,
                 request.CurrencyCode,
                 request.OccurredOn,
-                request.Note,
-                ToLines(request.Lines)),
+                ToLines(request.Lines),
+                request.Note),
             ct);
     }
 
-    private static List<ExpenseLineInput>? ToLines(IReadOnlyList<ExpenseLineDto>? lines) =>
-        lines?.Select(line => new ExpenseLineInput(line.Description, line.Quantity, line.UnitPrice)).ToList();
+    private static List<ExpenseLineInput> ToLines(IReadOnlyList<ExpenseLineDto> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        return lines.Select(line => new ExpenseLineInput(
+            line.Description,
+            new CategoryId(line.CategoryId),
+            line.Amount,
+            line.QuantityValue,
+            line.QuantityUnit is null ? null : QuantityUnits.FromCode(line.QuantityUnit))).ToList();
+    }
 }

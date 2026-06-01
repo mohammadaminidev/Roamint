@@ -8,30 +8,56 @@ public class ExpenseTests
 {
     private static readonly FakeTimeProvider Clock = new(DateTimeOffset.Parse("2026-05-29T12:00:00Z", CultureInfo.InvariantCulture));
     private static readonly DateOnly Today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
-    private static readonly CategoryId AnyCategory = CategoryId.New(Clock);
+    private static readonly CategoryId Food = CategoryId.New(Clock);
+    private static readonly CategoryId Hygiene = CategoryId.New(Clock);
+
+    private static ExpenseLineDraft Line(string description, decimal amount, Currency currency, CategoryId? category = null, Quantity? quantity = null) =>
+        new(description, category ?? Food, Money.Of(amount, currency), quantity);
 
     [Fact]
-    public void Record_happy_path_raises_ExpenseRecorded()
+    public void Record_happy_path_derives_total_and_raises_ExpenseRecorded()
     {
-        var amount = Money.Of(12.50m, Currency.Usd);
         var id = ExpenseId.New(Clock);
+        var lines = new[]
+        {
+            Line("Apple", 400m, Currency.Amd, Food),
+            Line("Shampoo", 1000m, Currency.Amd, Hygiene),
+        };
 
-        var expense = Expense.Record(id, AnyCategory, amount, Today, Clock, note: "  Lunch  ");
+        var expense = Expense.Record(id, Today, lines, Clock, note: "  Groceries  ");
 
-        expense.Amount.ShouldBe(amount);
         expense.OccurredOn.ShouldBe(Today);
-        expense.Note.ShouldBe("Lunch");
-        expense.Lines.ShouldBeEmpty();
+        expense.Note.ShouldBe("Groceries");
+        expense.Currency.ShouldBe(Currency.Amd);
+        expense.Total.ShouldBe(Money.Of(1400m, Currency.Amd));
+        expense.Lines.Count.ShouldBe(2);
+
         var ev = expense.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<ExpenseRecorded>();
         ev.ExpenseId.ShouldBe(id);
-        ev.Amount.ShouldBe(amount);
+        ev.Total.ShouldBe(Money.Of(1400m, Currency.Amd));
+        ev.OccurredOn.ShouldBe(Today);
     }
 
     [Fact]
-    public void Record_rejects_non_positive_amount()
+    public void Record_keeps_per_line_category()
+    {
+        var lines = new[]
+        {
+            Line("Apple", 400m, Currency.Amd, Food),
+            Line("Shampoo", 1000m, Currency.Amd, Hygiene),
+        };
+
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, lines, Clock);
+
+        expense.Lines[0].CategoryId.ShouldBe(Food);
+        expense.Lines[1].CategoryId.ShouldBe(Hygiene);
+    }
+
+    [Fact]
+    public void Record_rejects_empty_lines()
     {
         Should.Throw<DomainException>(() =>
-            Expense.Record(ExpenseId.New(Clock), AnyCategory, Money.Of(0m, Currency.Usd), Today, Clock));
+            Expense.Record(ExpenseId.New(Clock), Today, [], Clock));
     }
 
     [Fact]
@@ -39,92 +65,80 @@ public class ExpenseTests
     {
         var future = Today.AddDays(1);
         Should.Throw<DomainException>(() =>
-            Expense.Record(ExpenseId.New(Clock), AnyCategory, Money.Of(5m, Currency.Usd), future, Clock));
+            Expense.Record(ExpenseId.New(Clock), future, [Line("Apple", 5m, Currency.Usd)], Clock));
     }
 
     [Fact]
-    public void Record_accepts_matching_line_totals()
+    public void Record_rejects_line_with_non_positive_amount()
     {
-        var amount = Money.Of(10m, Currency.Usd);
+        Should.Throw<DomainException>(() =>
+            Expense.Record(ExpenseId.New(Clock), Today, [Line("Apple", 0m, Currency.Usd)], Clock));
+    }
+
+    [Fact]
+    public void Record_rejects_lines_with_mixed_currencies()
+    {
         var lines = new[]
         {
-            new ExpenseLineDraft("Bread", 2m, Money.Of(2m, Currency.Usd)),
-            new ExpenseLineDraft("Milk", 3m, Money.Of(2m, Currency.Usd)),
+            Line("Apple", 5m, Currency.Usd),
+            Line("Shampoo", 1000m, Currency.Amd),
         };
 
-        var expense = Expense.Record(ExpenseId.New(Clock), AnyCategory, amount, Today, Clock, lines: lines);
+        Should.Throw<DomainException>(() =>
+            Expense.Record(ExpenseId.New(Clock), Today, lines, Clock));
+    }
 
+    [Fact]
+    public void Record_rejects_blank_line_description()
+    {
+        // Null/blank is a guard-clause ArgumentException; the length rule is the DomainException.
+        Should.Throw<ArgumentException>(() =>
+            Expense.Record(ExpenseId.New(Clock), Today, [Line("   ", 5m, Currency.Usd)], Clock));
+    }
+
+    [Fact]
+    public void Record_carries_optional_quantity()
+    {
+        var lines = new[]
+        {
+            Line("Apple", 400m, Currency.Amd, Food, Quantity.Of(500m, QuantityUnit.Grams)),
+            Line("Knife", 900m, Currency.Amd, Food),
+        };
+
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, lines, Clock);
+
+        expense.Lines[0].Quantity.ShouldBe(Quantity.Of(500m, QuantityUnit.Grams));
+        expense.Lines[1].Quantity.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Record_trims_blank_note_to_null()
+    {
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, [Line("Apple", 5m, Currency.Usd)], Clock, note: "   ");
+
+        expense.Note.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Correct_replaces_lines_and_raises_event_with_new_total()
+    {
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, [Line("Apple", 5m, Currency.Usd)], Clock);
+        expense.ClearDomainEvents();
+
+        expense.Correct(Today, [Line("Bread", 3m, Currency.Usd), Line("Milk", 4m, Currency.Usd)], Clock, note: "Corrected");
+
+        expense.Total.ShouldBe(Money.Of(7m, Currency.Usd));
         expense.Lines.Count.ShouldBe(2);
-        expense.Lines.Sum(l => l.LineTotal.Amount).ShouldBe(amount.Amount);
-    }
-
-    [Fact]
-    public void Record_rejects_mismatched_line_total()
-    {
-        var amount = Money.Of(10m, Currency.Usd);
-        var lines = new[] { new ExpenseLineDraft("Bread", 1m, Money.Of(9m, Currency.Usd)) };
-
-        Should.Throw<DomainException>(() =>
-            Expense.Record(ExpenseId.New(Clock), AnyCategory, amount, Today, Clock, lines: lines));
-    }
-
-    [Fact]
-    public void Record_rejects_line_with_mismatched_currency()
-    {
-        var amount = Money.Of(10m, Currency.Usd);
-        var lines = new[] { new ExpenseLineDraft("Bread", 1m, Money.Of(10m, Currency.Amd)) };
-
-        Should.Throw<DomainException>(() =>
-            Expense.Record(ExpenseId.New(Clock), AnyCategory, amount, Today, Clock, lines: lines));
-    }
-
-    [Fact]
-    public void Recategorize_to_same_category_is_noop()
-    {
-        var expense = Expense.Record(ExpenseId.New(Clock), AnyCategory, Money.Of(5m, Currency.Usd), Today, Clock);
-        expense.ClearDomainEvents();
-
-        expense.Recategorize(AnyCategory);
-
-        expense.DomainEvents.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void Recategorize_raises_event_with_old_and_new_ids()
-    {
-        var expense = Expense.Record(ExpenseId.New(Clock), AnyCategory, Money.Of(5m, Currency.Usd), Today, Clock);
-        expense.ClearDomainEvents();
-        var newCategory = CategoryId.New(Clock);
-
-        expense.Recategorize(newCategory);
-
-        var ev = expense.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<ExpenseRecategorized>();
-        ev.PreviousCategoryId.ShouldBe(AnyCategory);
-        ev.NewCategoryId.ShouldBe(newCategory);
-    }
-
-    [Fact]
-    public void Correct_updates_state_and_raises_event()
-    {
-        var expense = Expense.Record(ExpenseId.New(Clock), AnyCategory, Money.Of(5m, Currency.Usd), Today, Clock);
-        expense.ClearDomainEvents();
-        var newAmount = Money.Of(7.50m, Currency.Usd);
-
-        expense.Correct(newAmount, Today, Clock, note: "Corrected");
-
-        expense.Amount.ShouldBe(newAmount);
         expense.Note.ShouldBe("Corrected");
         expense.DomainEvents.ShouldHaveSingleItem().ShouldBeOfType<ExpenseCorrected>()
-            .Amount.ShouldBe(newAmount);
+            .Total.ShouldBe(Money.Of(7m, Currency.Usd));
     }
 
     [Fact]
-    public void ExpenseLine_rejects_non_positive_quantity()
+    public void Correct_rejects_empty_lines()
     {
-        var amount = Money.Of(5m, Currency.Usd);
-        var bad = new[] { new ExpenseLineDraft("Bread", 0m, Money.Of(5m, Currency.Usd)) };
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, [Line("Apple", 5m, Currency.Usd)], Clock);
 
-        Should.Throw<DomainException>(() =>
-            Expense.Record(ExpenseId.New(Clock), AnyCategory, amount, Today, Clock, lines: bad));
+        Should.Throw<DomainException>(() => expense.Correct(Today, [], Clock));
     }
 }

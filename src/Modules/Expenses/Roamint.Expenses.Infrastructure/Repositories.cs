@@ -19,9 +19,10 @@ internal sealed class CategoryRepository(ExpensesDbContext db) : ICategoryReposi
 
 internal sealed class ExpenseRepository(ExpensesDbContext db) : IExpenseRepository
 {
-    // Lines is an owned collection, so EF loads it with the aggregate — no Include needed.
+    // Lines are a regular child entity (0008 D4b), so load them explicitly; the owned Quantity on each
+    // line comes along automatically.
     public Task<Expense?> GetAsync(ExpenseId id, CancellationToken ct) =>
-        db.Expenses.FirstOrDefaultAsync(expense => expense.Id == id, ct);
+        db.Expenses.Include(expense => expense.Lines).FirstOrDefaultAsync(expense => expense.Id == id, ct);
 
     public Task AddAsync(Expense expense, CancellationToken ct)
     {

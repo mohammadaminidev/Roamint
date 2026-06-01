@@ -15,26 +15,32 @@ public interface IExpensesApi
 
     Task<Guid> RecordExpenseAsync(RecordExpenseRequest request, CancellationToken ct = default);
 
-    Task RecategorizeExpenseAsync(Guid expenseId, Guid categoryId, CancellationToken ct = default);
-
     Task CorrectExpenseAsync(Guid expenseId, CorrectExpenseRequest request, CancellationToken ct = default);
 }
 
 public sealed record CreateCategoryRequest(string Name);
 
-public sealed record ExpenseLineDto(string Description, decimal Quantity, decimal UnitPrice);
-
-public sealed record RecordExpenseRequest(
+/// <summary>
+/// A line item on a record/correct request. The item is the categorized unit, so each line carries its
+/// own <see cref="CategoryId"/> and the <see cref="Amount"/> paid. <see cref="QuantityValue"/> /
+/// <see cref="QuantityUnit"/> are optional and travel together — supply both or neither; the unit is the
+/// canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>).
+/// </summary>
+public sealed record ExpenseLineDto(
+    string Description,
     Guid CategoryId,
     decimal Amount,
+    decimal? QuantityValue = null,
+    string? QuantityUnit = null);
+
+public sealed record RecordExpenseRequest(
     string CurrencyCode,
     DateOnly OccurredOn,
-    string? Note = null,
-    IReadOnlyList<ExpenseLineDto>? Lines = null);
+    IReadOnlyList<ExpenseLineDto> Lines,
+    string? Note = null);
 
 public sealed record CorrectExpenseRequest(
-    decimal Amount,
     string CurrencyCode,
     DateOnly OccurredOn,
-    string? Note = null,
-    IReadOnlyList<ExpenseLineDto>? Lines = null);
+    IReadOnlyList<ExpenseLineDto> Lines,
+    string? Note = null);

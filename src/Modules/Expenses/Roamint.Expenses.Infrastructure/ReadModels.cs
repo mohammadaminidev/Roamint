@@ -29,11 +29,11 @@ internal sealed class ListActiveCategoriesHandler(ExpensesDbContext db)
 }
 
 /// <summary>
-/// Autocomplete over item history. The corpus is the union of distinct notes and line descriptions;
-/// each suggestion carries the category last used with that text so the UI can fill the field and light
-/// the chip in one round trip. Filtering is an <c>ILIKE %text%</c> in SQL; prefix-vs-contains ranking,
-/// case-insensitive de-dupe, and recency ordering happen in memory over the small matched set (personal
-/// scale — a trigram index is a future concern, not built).
+/// Autocomplete over item history. The corpus is the distinct line descriptions; each suggestion carries
+/// the category and quantity unit last used with that text so the UI can fill the field, light the chip,
+/// and pre-select the unit in one round trip. Filtering is an <c>ILIKE %text%</c> in SQL; prefix-vs-contains
+/// ranking, case-insensitive de-dupe, and recency ordering happen in memory over the small matched set
+/// (personal scale — a trigram index is a future concern, not built).
 /// </summary>
 internal sealed class SuggestItemsHandler(ExpensesDbContext db)
     : IQueryHandler<SuggestItems, IReadOnlyList<ItemSuggestionView>>
@@ -48,21 +48,20 @@ internal sealed class SuggestItemsHandler(ExpensesDbContext db)
 
         var pattern = $"%{Like.Escape(text)}%";
 
-        var noteRows = await db.Expenses
-            .AsNoTracking()
-            .Where(expense => expense.Note != null && EF.Functions.ILike(expense.Note!, pattern, Like.EscapeChar))
-            .Select(expense => new Candidate(expense.Note!, expense.CategoryId, expense.OccurredOn, expense.Id))
-            .ToListAsync(ct);
-
-        var lineRows = await db.Expenses
+        // Push the ILIKE inside the navigation so it translates over the line collection (0007 EF trap).
+        var rows = await db.Expenses
             .AsNoTracking()
             .SelectMany(expense => expense.Lines
                 .Where(line => EF.Functions.ILike(line.Description, pattern, Like.EscapeChar))
-                .Select(line => new Candidate(line.Description, expense.CategoryId, expense.OccurredOn, expense.Id)))
+                .Select(line => new Candidate(
+                    line.Description,
+                    line.CategoryId,
+                    line.Quantity != null ? line.Quantity.Unit : (QuantityUnit?)null,
+                    expense.OccurredOn,
+                    expense.Id)))
             .ToListAsync(ct);
 
-        return noteRows
-            .Concat(lineRows)
+        return rows
             .GroupBy(candidate => candidate.Text, StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
@@ -77,17 +76,21 @@ internal sealed class SuggestItemsHandler(ExpensesDbContext db)
             .ThenByDescending(entry => entry.mostRecent.OccurredOn)
             .ThenByDescending(entry => entry.mostRecent.ExpenseId.Value)
             .Take(query.Limit)
-            .Select(entry => new ItemSuggestionView(entry.mostRecent.Text, entry.mostRecent.CategoryId.Value))
+            .Select(entry => new ItemSuggestionView(
+                entry.mostRecent.Text,
+                entry.mostRecent.CategoryId.Value,
+                entry.mostRecent.Unit?.ToCode()))
             .ToList();
     }
 
-    private readonly record struct Candidate(string Text, CategoryId CategoryId, DateOnly OccurredOn, ExpenseId ExpenseId);
+    private readonly record struct Candidate(
+        string Text, CategoryId CategoryId, QuantityUnit? Unit, DateOnly OccurredOn, ExpenseId ExpenseId);
 }
 
 /// <summary>
-/// Rule-based category guess. Gathers the distinct prior expenses whose note or any line description
-/// matches the item text, groups them by category, and returns the category whose most recent match is
-/// newest — frequency breaks same-date ties. Null when nothing matches.
+/// Rule-based category guess. Gathers the prior lines whose description matches the item text, groups them
+/// by category, and returns the category whose most recent match is newest — frequency breaks same-date
+/// ties. Null when nothing matches.
 /// </summary>
 internal sealed class SuggestCategoryHandler(ExpensesDbContext db)
     : IQueryHandler<SuggestCategory, Guid?>
@@ -104,10 +107,9 @@ internal sealed class SuggestCategoryHandler(ExpensesDbContext db)
 
         var matches = await db.Expenses
             .AsNoTracking()
-            .Where(expense =>
-                (expense.Note != null && EF.Functions.ILike(expense.Note!, pattern, Like.EscapeChar))
-                || expense.Lines.Any(line => EF.Functions.ILike(line.Description, pattern, Like.EscapeChar)))
-            .Select(expense => new { expense.CategoryId, expense.OccurredOn, expense.Id })
+            .SelectMany(expense => expense.Lines
+                .Where(line => EF.Functions.ILike(line.Description, pattern, Like.EscapeChar))
+                .Select(line => new { line.CategoryId, expense.OccurredOn, expense.Id }))
             .ToListAsync(ct);
 
         if (matches.Count == 0)

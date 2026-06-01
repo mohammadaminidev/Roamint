@@ -10,13 +10,7 @@ public sealed record CategoryArchived(CategoryId CategoryId) : IDomainEvent;
 
 public sealed record ExpenseRecorded(
     ExpenseId ExpenseId,
-    CategoryId CategoryId,
-    Money Amount,
+    Money Total,
     DateOnly OccurredOn) : IDomainEvent;
 
-public sealed record ExpenseRecategorized(
-    ExpenseId ExpenseId,
-    CategoryId PreviousCategoryId,
-    CategoryId NewCategoryId) : IDomainEvent;
-
-public sealed record ExpenseCorrected(ExpenseId ExpenseId, Money Amount, DateOnly OccurredOn) : IDomainEvent;
+public sealed record ExpenseCorrected(ExpenseId ExpenseId, Money Total, DateOnly OccurredOn) : IDomainEvent;

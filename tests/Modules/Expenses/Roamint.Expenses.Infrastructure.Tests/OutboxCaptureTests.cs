@@ -21,7 +21,8 @@ public sealed class OutboxCaptureTests(PostgresFixture fixture)
 
         var category = Category.Create(categoryId, "Rent");
         var expense = Expense.Record(
-            expenseId, categoryId, Money.Of(800m, Currency.Usdt), new DateOnly(2026, 4, 1), clock);
+            expenseId, new DateOnly(2026, 4, 1),
+            [new ExpenseLineDraft("Rent", categoryId, Money.Of(800m, Currency.Usdt))], clock);
 
         db.Categories.Add(category);
         db.Expenses.Add(expense);

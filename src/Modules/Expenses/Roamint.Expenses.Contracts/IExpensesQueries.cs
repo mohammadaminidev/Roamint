@@ -9,8 +9,9 @@ public interface IExpensesQueries
     Task<IReadOnlyList<CategoryListItem>> ListActiveCategoriesAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Autocomplete over prior item text (notes + line descriptions) matching <paramref name="prefix"/>,
-    /// each carrying the category last used with it so a pick can light the chip without a second call.
+    /// Autocomplete over prior item text (line descriptions) matching <paramref name="prefix"/>, each
+    /// carrying the category and quantity unit last used with it so a pick can fill the field, light the
+    /// chip, and pre-select the unit without a second call.
     /// </summary>
     Task<IReadOnlyList<ItemSuggestion>> SuggestItemsAsync(string prefix, int limit, CancellationToken ct = default);
 
@@ -24,5 +25,6 @@ public interface IExpensesQueries
 
 public sealed record CategoryListItem(Guid Id, string Name);
 
-/// <summary>An autocomplete suggestion: the historical item text and the category last used with it.</summary>
-public sealed record ItemSuggestion(string Text, Guid? CategoryId);
+/// <summary>An autocomplete suggestion: the historical item text plus the category and quantity unit
+/// (canonical code, or null) last used with it.</summary>
+public sealed record ItemSuggestion(string Text, Guid? CategoryId, string? Unit);

@@ -53,10 +53,6 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("category_id");
-
                     b.Property<string>("Note")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -66,7 +62,31 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("occurred_on");
 
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Roamint.Expenses.Domain.Expense.Amount#Money", b1 =>
+                    b.HasKey("Id");
+
+                    b.ToTable("expenses", "expenses");
+                });
+
+            modelBuilder.Entity("Roamint.Expenses.Domain.ExpenseLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid>("expense_id")
+                        .HasColumnType("uuid");
+
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Amount", "Roamint.Expenses.Domain.ExpenseLine.Amount#Money", b1 =>
                         {
                             b1.IsRequired();
 
@@ -84,7 +104,9 @@ namespace Roamint.Expenses.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("expenses", "expenses");
+                    b.HasIndex("expense_id");
+
+                    b.ToTable("expense_lines", "expenses");
                 });
 
             modelBuilder.Entity("Roamint.Expenses.Infrastructure.Outbox.OutboxMessage", b =>
@@ -122,44 +144,43 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                     b.ToTable("outbox_messages", "expenses");
                 });
 
-            modelBuilder.Entity("Roamint.Expenses.Domain.Expense", b =>
+            modelBuilder.Entity("Roamint.Expenses.Domain.ExpenseLine", b =>
                 {
-                    b.OwnsMany("Roamint.Expenses.Domain.ExpenseLine", "Lines", b1 =>
+                    b.HasOne("Roamint.Expenses.Domain.Expense", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("expense_id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("Roamint.Expenses.Domain.Quantity", "Quantity", b1 =>
                         {
-                            b1.Property<Guid>("Id")
-                                .HasColumnType("uuid")
-                                .HasColumnName("id");
-
-                            b1.Property<string>("Description")
-                                .IsRequired()
-                                .HasMaxLength(200)
-                                .HasColumnType("character varying(200)")
-                                .HasColumnName("description");
-
-                            b1.Property<decimal>("Quantity")
-                                .HasPrecision(18, 4)
-                                .HasColumnType("numeric(18,4)")
-                                .HasColumnName("quantity");
-
-                            b1.Property<string>("UnitPrice")
-                                .IsRequired()
-                                .HasMaxLength(40)
-                                .HasColumnType("character varying(40)")
-                                .HasColumnName("unit_price");
-
-                            b1.Property<Guid>("expense_id")
+                            b1.Property<Guid>("ExpenseLineId")
                                 .HasColumnType("uuid");
 
-                            b1.HasKey("Id");
+                            b1.Property<string>("Unit")
+                                .IsRequired()
+                                .HasMaxLength(8)
+                                .HasColumnType("character varying(8)")
+                                .HasColumnName("quantity_unit");
 
-                            b1.HasIndex("expense_id");
+                            b1.Property<decimal>("Value")
+                                .HasPrecision(18, 4)
+                                .HasColumnType("numeric(18,4)")
+                                .HasColumnName("quantity_value");
+
+                            b1.HasKey("ExpenseLineId");
 
                             b1.ToTable("expense_lines", "expenses");
 
                             b1.WithOwner()
-                                .HasForeignKey("expense_id");
+                                .HasForeignKey("ExpenseLineId");
                         });
 
+                    b.Navigation("Quantity");
+                });
+
+            modelBuilder.Entity("Roamint.Expenses.Domain.Expense", b =>
+                {
                     b.Navigation("Lines");
                 });
 #pragma warning restore 612, 618

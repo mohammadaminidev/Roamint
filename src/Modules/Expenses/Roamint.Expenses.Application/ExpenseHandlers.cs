@@ -15,72 +15,74 @@ internal sealed class RecordExpenseHandler(
         ArgumentNullException.ThrowIfNull(command);
 
         var currency = Currency.FromCode(command.CurrencyCode);
-        await EnsureActiveCategoryAsync(categories, command.CategoryId, ct);
+        await EnsureActiveCategoriesAsync(categories, command.Lines, ct);
 
         var id = ExpenseId.New(clock);
         var expense = Expense.Record(
             id,
-            command.CategoryId,
-            Money.Of(command.Amount, currency),
             command.OccurredOn,
+            ToDrafts(command.Lines, currency),
             clock,
-            command.Note,
-            ToDrafts(command.Lines, currency));
+            command.Note);
 
         await expenses.AddAsync(expense, ct);
         await unitOfWork.SaveChangesAsync(ct);
         return id;
     }
 
-    internal static async Task EnsureActiveCategoryAsync(
+    /// <summary>Validates every category referenced by the lines exists and is not archived. Distinct
+    /// so a trip with many lines in the same category hits the repository once per category.</summary>
+    internal static async Task EnsureActiveCategoriesAsync(
         ICategoryRepository categories,
-        CategoryId categoryId,
+        IReadOnlyList<ExpenseLineInput> lines,
         CancellationToken ct)
     {
-        var category = await categories.GetAsync(categoryId, ct)
-            ?? throw new CategoryNotFoundException(categoryId);
+        ArgumentNullException.ThrowIfNull(lines);
 
-        if (category.Status == CategoryStatus.Archived)
+        foreach (var categoryId in lines.Select(line => line.CategoryId).Distinct())
         {
-            throw new DomainException($"Category '{category.Name}' is archived and cannot accept expenses.");
+            var category = await categories.GetAsync(categoryId, ct)
+                ?? throw new CategoryNotFoundException(categoryId);
+
+            if (category.Status == CategoryStatus.Archived)
+            {
+                throw new DomainException($"Category '{category.Name}' is archived and cannot accept expenses.");
+            }
         }
     }
 
-    internal static IEnumerable<ExpenseLineDraft>? ToDrafts(
-        IReadOnlyList<ExpenseLineInput>? lines,
+    internal static IEnumerable<ExpenseLineDraft> ToDrafts(
+        IReadOnlyList<ExpenseLineInput> lines,
         Currency currency)
     {
-        if (lines is null)
+        ArgumentNullException.ThrowIfNull(lines);
+
+        return lines.Select(line => new ExpenseLineDraft(
+            line.Description,
+            line.CategoryId,
+            Money.Of(line.Amount, currency),
+            ToQuantity(line)));
+    }
+
+    private static Quantity? ToQuantity(ExpenseLineInput line)
+    {
+        if (line.QuantityValue is null && line.QuantityUnit is null)
         {
             return null;
         }
 
-        return lines.Select(line =>
-            new ExpenseLineDraft(line.Description, line.Quantity, Money.Of(line.UnitPrice, currency)));
-    }
-}
+        if (line.QuantityValue is null || line.QuantityUnit is null)
+        {
+            throw new DomainException("A line quantity needs both a value and a unit, or neither.");
+        }
 
-internal sealed class RecategorizeExpenseHandler(
-    IExpenseRepository expenses,
-    ICategoryRepository categories,
-    IUnitOfWork unitOfWork) : ICommandHandler<RecategorizeExpense>
-{
-    public async Task HandleAsync(RecategorizeExpense command, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var expense = await expenses.GetAsync(command.ExpenseId, ct)
-            ?? throw new ExpenseNotFoundException(command.ExpenseId);
-
-        await RecordExpenseHandler.EnsureActiveCategoryAsync(categories, command.CategoryId, ct);
-
-        expense.Recategorize(command.CategoryId);
-        await unitOfWork.SaveChangesAsync(ct);
+        return Quantity.Of(line.QuantityValue.Value, line.QuantityUnit.Value);
     }
 }
 
 internal sealed class CorrectExpenseHandler(
     IExpenseRepository expenses,
+    ICategoryRepository categories,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<CorrectExpense>
 {
@@ -92,12 +94,13 @@ internal sealed class CorrectExpenseHandler(
             ?? throw new ExpenseNotFoundException(command.ExpenseId);
 
         var currency = Currency.FromCode(command.CurrencyCode);
+        await RecordExpenseHandler.EnsureActiveCategoriesAsync(categories, command.Lines, ct);
+
         expense.Correct(
-            Money.Of(command.Amount, currency),
             command.OccurredOn,
+            RecordExpenseHandler.ToDrafts(command.Lines, currency),
             clock,
-            command.Note,
-            RecordExpenseHandler.ToDrafts(command.Lines, currency));
+            command.Note);
 
         await unitOfWork.SaveChangesAsync(ct);
     }

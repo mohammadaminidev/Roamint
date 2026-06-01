@@ -21,8 +21,7 @@
         <h2>New expense</h2>
 
         <div class="amount-row">
-            <input class="amount-input" type="text" inputmode="decimal" placeholder="0"
-                   value="@AmountDisplay" @oninput="OnAmountInput" readonly="@LinesMode" />
+            <input class="amount-input" type="text" value="@TotalDisplay" readonly />
             <div class="seg">
                 @foreach (var currency in Currencies)
                 {
@@ -31,15 +30,16 @@
                 }
             </div>
         </div>
-        @if (LinesMode)
-        {
-            <p class="hint amount-hint">Total of @lines.Count item@(lines.Count == 1 ? "" : "s")</p>
-        }
+        <p class="hint amount-hint">Total of @lines.Count item@(lines.Count == 1 ? "" : "s")</p>
 
         <div class="divider"></div>
 
         <div class="field">
-            <label>Category</label>
+            <div class="line-head">
+                <label>Items</label>
+                <button type="button" class="add-line" @onclick="AddLine">+ Add item</button>
+            </div>
+
             @if (categories is null)
             {
                 <p class="hint">Loading…</p>
@@ -50,57 +50,68 @@
             }
             else
             {
-                <div class="chips">
-                    @foreach (var category in categories)
-                    {
-                        <button type="button"
-                                class="chip @(category.Id == selectedCategoryId ? "active" : null)"
-                                @onclick="() => PickCategory(category.Id)">
-                            <span class="ic">@Icon(category.Name)</span> @category.Name
-                        </button>
-                    }
-                </div>
-            }
-        </div>
-
-        <div class="field">
-            <div class="line-head">
-                <label>Items (optional)</label>
-                <button type="button" class="add-line" @onclick="AddLine">+ Add item</button>
-            </div>
-            @if (lines.Count == 0)
-            {
-                <p class="hint">Add items to itemise — the amount is then their total.</p>
-            }
-            else
-            {
                 @for (var index = 0; index < lines.Count; index++)
                 {
                     var i = index;
                     var line = lines[i];
                     var key = $"line-{i}";
-                    <div class="line">
-                        <div class="line-desc">
+                    <div class="line-card">
+                        <div class="line-top">
                             <input type="text" placeholder="Item" value="@line.Description"
                                    @oninput="e => OnLineDescInput(i, e)"
                                    @onfocus="() => activeSuggestKey = key"
                                    @onblur="() => OnLineBlur(i)" />
+                            @if (lines.Count > 1)
+                            {
+                                <button type="button" class="line-remove" @onclick="() => RemoveLine(i)"
+                                        aria-label="Remove item">×</button>
+                            }
                             @if (activeSuggestKey == key && suggestions.Count > 0)
                             {
                                 <div class="suggest">
                                     @foreach (var suggestion in suggestions)
                                     {
                                         <button type="button" class="suggest-item"
-                                                @onclick="() => PickSuggestion(key, suggestion)">@suggestion.Text</button>
+                                                @onclick="() => PickSuggestion(i, suggestion)">@suggestion.Text</button>
                                     }
                                 </div>
                             }
                         </div>
-                        <input class="line-qty" type="text" inputmode="decimal" placeholder="1"
-                               value="@line.QuantityText" @oninput="e => OnLineQtyInput(i, e)" />
-                        <input class="line-price" type="text" inputmode="decimal" placeholder="0"
-                               value="@line.UnitPriceText" @oninput="e => OnLinePriceInput(i, e)" />
-                        <button type="button" class="line-remove" @onclick="() => RemoveLine(i)" aria-label="Remove item">×</button>
+
+                        <div class="line-cat">
+                            <button type="button" class="cat-current" @onclick="() => ToggleCatPicker(i)">
+                                <span class="ic">@Icon(CategoryName(line.CategoryId))</span>
+                                @(CategoryName(line.CategoryId) ?? "Pick category")
+                                <span class="caret">⌄</span>
+                            </button>
+                            @if (expandedCatLine == i)
+                            {
+                                <div class="chips">
+                                    @foreach (var category in categories)
+                                    {
+                                        <button type="button"
+                                                class="chip @(category.Id == line.CategoryId ? "active" : null)"
+                                                @onclick="() => PickCategory(i, category.Id)">
+                                            <span class="ic">@Icon(category.Name)</span> @category.Name
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="line-amounts">
+                            <input class="line-amount" type="text" inputmode="decimal" placeholder="Amount"
+                                   value="@line.AmountText" @oninput="e => OnLineAmountInput(i, e)" />
+                            <input class="line-qty" type="text" inputmode="decimal" placeholder="Qty"
+                                   value="@line.QuantityText" @oninput="e => OnLineQtyInput(i, e)" />
+                            <select class="line-unit" value="@(line.Unit ?? "")" @onchange="e => OnLineUnitChange(i, e)">
+                                <option value="">unit</option>
+                                @foreach (var unit in Units)
+                                {
+                                    <option value="@unit">@unit</option>
+                                }
+                            </select>
+                        </div>
                     </div>
                 }
             }
@@ -113,22 +124,7 @@
 
         <div class="field">
             <label>Note (optional)</label>
-            <div class="note-wrap">
-                <input type="text" placeholder="Lunch near the office" value="@noteText"
-                       @oninput="OnNoteInput"
-                       @onfocus="() => activeSuggestKey = NoteKey"
-                       @onblur="OnNoteBlur" />
-                @if (activeSuggestKey == NoteKey && suggestions.Count > 0)
-                {
-                    <div class="suggest">
-                        @foreach (var suggestion in suggestions)
-                        {
-                            <button type="button" class="suggest-item"
-                                    @onclick="() => PickSuggestion(NoteKey, suggestion)">@suggestion.Text</button>
-                        }
-                    </div>
-                }
-            </div>
+            <input type="text" placeholder="Lunch near the office" value="@noteText" @oninput="OnNoteInput" />
         </div>
 
         @if (error is not null)
@@ -147,7 +143,6 @@
 </div>
 
 @code {
-    private const string NoteKey = "note";
     private const int MinPrefix = 2;
     private const int SuggestLimit = 6;
 
@@ -156,8 +151,11 @@
     private sealed class LineRow
     {
         public string Description { get; set; } = string.Empty;
-        public string QuantityText { get; set; } = "1";
-        public string UnitPriceText { get; set; } = string.Empty;
+        public Guid? CategoryId { get; set; }
+        public bool UserPickedCategory { get; set; }
+        public string AmountText { get; set; } = string.Empty;
+        public string QuantityText { get; set; } = string.Empty;
+        public string? Unit { get; set; }
     }
 
     // The transactable currencies the form offers. IRR is display-only (toman view, later) and not here.
@@ -167,6 +165,9 @@
         new("AMD", 0),
         new("USDT", 2),
     ];
+
+    // The canonical quantity-unit codes (see QuantityUnit in the domain).
+    private static readonly string[] Units = ["g", "ml", "Pcs"];
 
     private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -178,14 +179,12 @@
     };
 
     private IReadOnlyList<CategoryListItem>? categories;
-    private Guid? selectedCategoryId;
-    private bool userPickedCategory;
     private string currencyCode = "AMD";
-    private string amountText = string.Empty;
     private DateOnly date;
     private DateOnly today;
     private string noteText = string.Empty;
     private readonly List<LineRow> lines = [];
+    private int? expandedCatLine;
     private bool submitting;
     private string? error;
     private string? success;
@@ -194,19 +193,19 @@
     private IReadOnlyList<ItemSuggestion> suggestions = [];
     private CancellationTokenSource? suggestCts;
 
-    private bool LinesMode => lines.Count > 0;
     private int Decimals => Currencies.First(currency => currency.Code == currencyCode).Decimals;
-    private string AmountDisplay => LinesMode
-        ? DerivedAmount().ToString($"F{Decimals}", CultureInfo.InvariantCulture)
-        : amountText;
+
+    private string TotalDisplay => DerivedTotal().ToString($"F{Decimals}", CultureInfo.InvariantCulture);
 
     protected override async Task OnInitializedAsync()
     {
         today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
         date = today;
         categories = await Queries.ListActiveCategoriesAsync();
-        selectedCategoryId = categories.Count > 0 ? categories[0].Id : null;
+        lines.Add(NewLine());
     }
+
+    private LineRow NewLine() => new() { CategoryId = categories is { Count: > 0 } ? categories[0].Id : null };
 
     private void SelectCurrency(string code)
     {
@@ -214,34 +213,58 @@
         error = null;
     }
 
-    private void PickCategory(Guid id)
+    // ---- Categories (per line) ----
+
+    private void ToggleCatPicker(int index) => expandedCatLine = expandedCatLine == index ? null : index;
+
+    private void PickCategory(int index, Guid id)
     {
-        selectedCategoryId = id;
-        userPickedCategory = true; // a manual tap is sticky — suggestions stop moving the chip.
+        lines[index].CategoryId = id;
+        lines[index].UserPickedCategory = true; // a manual tap is sticky — suggestions stop moving this line's chip.
+        expandedCatLine = null;
     }
 
-    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
+    private string? CategoryName(Guid? id) =>
+        id is Guid value ? categories?.FirstOrDefault(category => category.Id == value)?.Name : null;
+
+    private static string Icon(string? name) => name is not null && Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
 
     // ---- Lines ----
 
     private void AddLine()
     {
-        lines.Add(new LineRow());
+        lines.Add(NewLine());
         error = null;
     }
 
     private void RemoveLine(int index)
     {
         lines.RemoveAt(index);
-        if (activeSuggestKey is not null && activeSuggestKey.StartsWith("line-", StringComparison.Ordinal))
+        if (expandedCatLine == index)
+        {
+            expandedCatLine = null;
+        }
+
+        if (activeSuggestKey is not null)
         {
             ClearSuggestions();
         }
     }
 
-    private void OnLineQtyInput(int index, ChangeEventArgs e) => lines[index].QuantityText = e.Value?.ToString() ?? string.Empty;
+    private void OnLineAmountInput(int index, ChangeEventArgs e)
+    {
+        lines[index].AmountText = e.Value?.ToString() ?? string.Empty;
+        error = null;
+    }
 
-    private void OnLinePriceInput(int index, ChangeEventArgs e) => lines[index].UnitPriceText = e.Value?.ToString() ?? string.Empty;
+    private void OnLineQtyInput(int index, ChangeEventArgs e) =>
+        lines[index].QuantityText = e.Value?.ToString() ?? string.Empty;
+
+    private void OnLineUnitChange(int index, ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        lines[index].Unit = string.IsNullOrEmpty(value) ? null : value;
+    }
 
     private void OnLineDescInput(int index, ChangeEventArgs e)
     {
@@ -250,28 +273,19 @@
         QueueSuggest($"line-{index}", text);
     }
 
-    private async Task OnLineBlur(int index)
-    {
-        // The first line drives the category guess in line mode (see 0007 D4).
-        if (index == 0)
-        {
-            await SuggestCategoryFor(lines[index].Description);
-        }
-    }
+    private async Task OnLineBlur(int index) => await SuggestCategoryFor(index, lines[index].Description);
 
-    // Each line total mirrors the domain exactly: round the unit price to the currency's minor units,
-    // multiply by quantity, round again. Summing these is byte-identical to what the aggregate re-derives,
-    // so the locked amount can never trip the line-sum invariant.
-    private decimal DerivedAmount()
+    // Total is the plain sum of paid line amounts, each rounded to the currency's minor units — the same
+    // arithmetic the aggregate re-derives, so the read-only total can never diverge from what is stored.
+    private decimal DerivedTotal()
     {
         var decimals = Decimals;
         var sum = 0m;
         foreach (var line in lines)
         {
-            if (TryParseDecimal(line.QuantityText, out var qty) && TryParseDecimal(line.UnitPriceText, out var price))
+            if (TryParseDecimal(line.AmountText, out var amount))
             {
-                var unit = Math.Round(price, decimals, MidpointRounding.AwayFromZero);
-                sum += Math.Round(unit * qty, decimals, MidpointRounding.AwayFromZero);
+                sum += Math.Round(amount, decimals, MidpointRounding.AwayFromZero);
             }
         }
 
@@ -280,20 +294,7 @@
 
     // ---- Note ----
 
-    private void OnNoteInput(ChangeEventArgs e)
-    {
-        noteText = e.Value?.ToString() ?? string.Empty;
-        QueueSuggest(NoteKey, noteText);
-    }
-
-    private async Task OnNoteBlur()
-    {
-        // In line mode the first line drives the category; the note only drives it in simple mode (0007 D4).
-        if (!LinesMode)
-        {
-            await SuggestCategoryFor(noteText);
-        }
-    }
+    private void OnNoteInput(ChangeEventArgs e) => noteText = e.Value?.ToString() ?? string.Empty;
 
     // ---- Autocomplete + category suggestion ----
 
@@ -333,31 +334,24 @@
         }
     }
 
-    private void PickSuggestion(string key, ItemSuggestion suggestion)
+    // Picking a suggestion fills the line's text, lights its category, and pre-selects its unit in one go.
+    private void PickSuggestion(int index, ItemSuggestion suggestion)
     {
-        if (key == NoteKey)
+        var line = lines[index];
+        line.Description = suggestion.Text;
+        ApplySuggestedCategory(line, suggestion.CategoryId);
+        if (suggestion.Unit is not null && Units.Contains(suggestion.Unit))
         {
-            noteText = suggestion.Text;
-        }
-        else if (key.StartsWith("line-", StringComparison.Ordinal)
-                 && int.TryParse(key.AsSpan("line-".Length), out var index)
-                 && index < lines.Count)
-        {
-            lines[index].Description = suggestion.Text;
-        }
-
-        // Only the category-driving field (simple-mode note, line-0) lights the chip from a pick.
-        if (key == NoteKey || key == "line-0")
-        {
-            ApplySuggestedCategory(suggestion.CategoryId);
+            line.Unit = suggestion.Unit;
         }
 
         ClearSuggestions();
     }
 
-    private async Task SuggestCategoryFor(string text)
+    private async Task SuggestCategoryFor(int index, string text)
     {
-        if (userPickedCategory)
+        var line = lines[index];
+        if (line.UserPickedCategory)
         {
             return;
         }
@@ -369,19 +363,19 @@
         }
 
         var categoryId = await Queries.SuggestCategoryAsync(item);
-        ApplySuggestedCategory(categoryId);
+        ApplySuggestedCategory(line, categoryId);
     }
 
-    private void ApplySuggestedCategory(Guid? categoryId)
+    private void ApplySuggestedCategory(LineRow line, Guid? categoryId)
     {
-        if (userPickedCategory || categoryId is not Guid id || categories is null)
+        if (line.UserPickedCategory || categoryId is not Guid id || categories is null)
         {
             return;
         }
 
         if (categories.Any(category => category.Id == id))
         {
-            selectedCategoryId = id;
+            line.CategoryId = id;
         }
     }
 
@@ -394,42 +388,20 @@
 
     // ---- Submit ----
 
-    private void OnAmountInput(ChangeEventArgs e)
-    {
-        if (!LinesMode)
-        {
-            amountText = e.Value?.ToString() ?? string.Empty;
-        }
-    }
-
     private async Task Submit()
     {
         error = null;
         success = null;
 
-        if (selectedCategoryId is null)
+        if (categories is null || categories.Count == 0)
         {
-            error = "Pick a category.";
+            error = "No categories available.";
             return;
         }
 
-        decimal amount;
-        IReadOnlyList<ExpenseLineDto>? lineDtos = null;
-
-        if (LinesMode)
+        if (!TryBuildLines(out var dtos, out var lineError))
         {
-            if (!TryBuildLines(out var dtos, out var lineError))
-            {
-                error = lineError;
-                return;
-            }
-
-            lineDtos = dtos;
-            amount = DerivedAmount();
-        }
-        else if (!TryParseAmount(out amount))
-        {
-            error = "Enter a valid amount greater than zero.";
+            error = lineError;
             return;
         }
 
@@ -443,13 +415,13 @@
         try
         {
             var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
-            await Api.RecordExpenseAsync(
-                new RecordExpenseRequest(selectedCategoryId.Value, amount, currencyCode, date, note, lineDtos));
+            await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
 
-            success = $"Recorded {Format(amount)} {currencyCode}.";
-            amountText = string.Empty;
+            success = $"Recorded {TotalDisplay} {currencyCode}.";
             noteText = string.Empty;
             lines.Clear();
+            lines.Add(NewLine());
+            expandedCatLine = null;
         }
         catch (DomainException ex)
         {
@@ -468,46 +440,54 @@
         lineError = null;
         foreach (var line in lines)
         {
-            if (string.IsNullOrWhiteSpace(line.Description))
+            var description = line.Description.Trim();
+            if (string.IsNullOrEmpty(description))
             {
-                lineError = "Every item needs a description.";
+                lineError = "Every item needs a name.";
                 return false;
             }
 
-            if (!TryParseDecimal(line.QuantityText, out var qty) || qty <= 0m)
+            if (line.CategoryId is not Guid categoryId)
             {
-                lineError = $"Item “{line.Description.Trim()}” needs a quantity greater than zero.";
+                lineError = $"Pick a category for “{description}”.";
                 return false;
             }
 
-            if (!TryParseDecimal(line.UnitPriceText, out var price) || price <= 0m)
+            if (!TryParseDecimal(line.AmountText, out var amount) || amount <= 0m)
             {
-                lineError = $"Item “{line.Description.Trim()}” needs a unit price greater than zero.";
+                lineError = $"“{description}” needs an amount greater than zero.";
                 return false;
             }
 
-            dtos.Add(new ExpenseLineDto(line.Description.Trim(), qty, price));
+            decimal? quantityValue = null;
+            string? quantityUnit = null;
+            var hasQty = !string.IsNullOrWhiteSpace(line.QuantityText);
+            if (hasQty)
+            {
+                if (!TryParseDecimal(line.QuantityText, out var qty) || qty <= 0m)
+                {
+                    lineError = $"“{description}” has an invalid quantity.";
+                    return false;
+                }
+
+                if (line.Unit is null)
+                {
+                    lineError = $"Pick a unit for “{description}”.";
+                    return false;
+                }
+
+                quantityValue = qty;
+                quantityUnit = line.Unit;
+            }
+
+            dtos.Add(new ExpenseLineDto(description, categoryId, amount, quantityValue, quantityUnit));
         }
 
         return dtos.Count > 0;
     }
 
-    private bool TryParseAmount(out decimal amount)
-    {
-        amount = 0m;
-        if (!TryParseDecimal(amountText, out var parsed))
-        {
-            return false;
-        }
-
-        amount = Math.Round(parsed, Decimals, MidpointRounding.AwayFromZero);
-        return amount > 0m;
-    }
-
     private static bool TryParseDecimal(string? text, out decimal value) =>
         decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
-
-    private string Format(decimal amount) => amount.ToString($"F{Decimals}", CultureInfo.InvariantCulture);
 
     public void Dispose() => suggestCts?.Cancel();
 }

@@ -12,8 +12,11 @@ public sealed class SuggestItemsHandlerTests(PostgresFixture fixture)
 
     private static FakeTimeProvider Clock() => new(new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero));
 
+    private static ExpenseLineDraft Draft(string description, CategoryId category, Quantity? quantity = null) =>
+        new(description, category, Money.Of(3m, Usd), quantity);
+
     [Fact]
-    public async Task Unions_notes_and_lines_dedupes_carries_most_recent_category_and_ranks_prefix_first()
+    public async Task Dedupes_lines_carries_most_recent_category_and_unit_and_ranks_prefix_first()
     {
         // Shared Postgres: a unique token keeps the ILIKE scan to this test's rows.
         var tag = $"SI{Guid.NewGuid():N}";
@@ -27,20 +30,20 @@ public sealed class SuggestItemsHandlerTests(PostgresFixture fixture)
             db.Categories.Add(Category.Create(cafe, $"{tag} Cafe"));
             db.Categories.Add(Category.Create(food, $"{tag} Food"));
 
-            // Same note twice — must de-dupe; the later (food) occurrence wins the carried category.
+            // Same line text twice — must de-dupe; the later (food) occurrence wins the carried category + unit.
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), cafe, Money.Of(3m, Usd), new DateOnly(2026, 4, 10), clock, note: $"{tag} Coffee"));
+                ExpenseId.New(clock), new DateOnly(2026, 4, 10), [Draft($"{tag} Coffee", cafe)], clock));
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), food, Money.Of(3m, Usd), new DateOnly(2026, 4, 20), clock, note: $"{tag} Coffee"));
+                ExpenseId.New(clock), new DateOnly(2026, 4, 20),
+                [Draft($"{tag} Coffee", food, Quantity.Of(250m, QuantityUnit.Milliliters))], clock));
 
-            // A contains-but-not-prefix note (the tag sits mid-string).
+            // A contains-but-not-prefix line (the tag sits mid-string).
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), cafe, Money.Of(4m, Usd), new DateOnly(2026, 4, 21), clock, note: $"Morning {tag} Coffee"));
+                ExpenseId.New(clock), new DateOnly(2026, 4, 21), [Draft($"Morning {tag} Coffee", cafe)], clock));
 
-            // A line description joins the same corpus.
             db.Expenses.Add(Expense.Record(
-                ExpenseId.New(clock), food, Money.Of(5m, Usd), new DateOnly(2026, 4, 22), clock,
-                lines: [new ExpenseLineDraft($"{tag} Croissant", 1m, Money.Of(5m, Usd))]));
+                ExpenseId.New(clock), new DateOnly(2026, 4, 22),
+                [Draft($"{tag} Croissant", food, Quantity.Of(1m, QuantityUnit.Pieces))], clock));
 
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
@@ -52,15 +55,17 @@ public sealed class SuggestItemsHandlerTests(PostgresFixture fixture)
 
             var texts = results.Select(r => r.Text).ToList();
 
-            // De-duped across the two identical notes.
             texts.Count(t => t == $"{tag} Coffee").ShouldBe(1);
-
-            // Both corpora present (note + line description).
             texts.ShouldContain($"{tag} Coffee");
             texts.ShouldContain($"{tag} Croissant");
 
-            // Carried category is the most recent use of that text (food, 04-20 > cafe, 04-10).
-            results.Single(r => r.Text == $"{tag} Coffee").CategoryId.ShouldBe(food.Value);
+            // Carried category + unit are the most recent use of that text (food, 04-20 > cafe, 04-10).
+            var coffee = results.Single(r => r.Text == $"{tag} Coffee");
+            coffee.CategoryId.ShouldBe(food.Value);
+            coffee.Unit.ShouldBe("ml");
+
+            // No-quantity history → null unit.
+            results.Single(r => r.Text == $"Morning {tag} Coffee").Unit.ShouldBeNull();
 
             // Prefix matches rank ahead of the contains-only "Morning …" entry.
             var firstContains = texts.IndexOf($"Morning {tag} Coffee");
@@ -82,8 +87,7 @@ public sealed class SuggestItemsHandlerTests(PostgresFixture fixture)
             for (var i = 0; i < 5; i++)
             {
                 db.Expenses.Add(Expense.Record(
-                    ExpenseId.New(clock), category, Money.Of(1m, Usd), new DateOnly(2026, 4, 10), clock,
-                    note: $"{tag} item {i}"));
+                    ExpenseId.New(clock), new DateOnly(2026, 4, 10), [Draft($"{tag} item {i}", category)], clock));
             }
 
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
