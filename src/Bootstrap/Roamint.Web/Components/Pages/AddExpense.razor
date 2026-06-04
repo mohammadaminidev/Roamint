@@ -99,6 +99,37 @@
                             }
                         </div>
 
+                        <div class="line-tags">
+                            @foreach (var tagId in line.TagIds)
+                            {
+                                var picked = TagById(tagId);
+                                <button type="button" class="tag-chip" @onclick="() => ToggleTag(i, tagId)">
+                                    @(picked?.Name ?? "tag") <span class="x">×</span>
+                                </button>
+                            }
+                            <button type="button" class="tag-add" @onclick="() => ToggleTagPicker(i)">+ Tag</button>
+                            @if (expandedTagLine == i)
+                            {
+                                <div class="tag-pop">
+                                    @foreach (var option in CompatibleTags(line.CategoryId).Where(t => !line.TagIds.Contains(t.Id)))
+                                    {
+                                        <button type="button" class="tag-opt" @onclick="() => ToggleTag(i, option.Id)">
+                                            @option.Name@(option.Scope is null ? " ·" : "")
+                                        </button>
+                                    }
+                                    <div class="tag-create">
+                                        <input type="text" placeholder="New tag" value="@newTagText"
+                                               @oninput="e => newTagText = e.Value?.ToString() ?? string.Empty" />
+                                        <label class="tag-global">
+                                            <input type="checkbox" checked="@newTagGlobal"
+                                                   @onchange="e => newTagGlobal = (bool)(e.Value ?? false)" /> Global
+                                        </label>
+                                        <button type="button" class="tag-make" @onclick="() => CreateInlineTag(i)">Add</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
                         <div class="line-amounts">
                             <input class="line-amount" type="text" inputmode="decimal" placeholder="Amount"
                                    value="@line.AmountText" @oninput="e => OnLineAmountInput(i, e)" />
@@ -156,6 +187,7 @@
         public string AmountText { get; set; } = string.Empty;
         public string QuantityText { get; set; } = string.Empty;
         public string? Unit { get; set; }
+        public List<Guid> TagIds { get; } = [];
     }
 
     // The transactable currencies the form offers. IRR is display-only (toman view, later) and not here.
@@ -179,6 +211,10 @@
     };
 
     private IReadOnlyList<CategoryListItem>? categories;
+    private IReadOnlyList<TagListItem> allTags = [];
+    private int? expandedTagLine;
+    private string newTagText = string.Empty;
+    private bool newTagGlobal;
     private string currencyCode = "AMD";
     private DateOnly date;
     private DateOnly today;
@@ -202,6 +238,7 @@
         today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
         date = today;
         categories = await Queries.ListActiveCategoriesAsync();
+        allTags = await Queries.ListTagsAsync();
         lines.Add(NewLine());
     }
 
@@ -221,6 +258,7 @@
     {
         lines[index].CategoryId = id;
         lines[index].UserPickedCategory = true; // a manual tap is sticky — suggestions stop moving this line's chip.
+        DropIncompatibleTags(lines[index]);
         expandedCatLine = null;
     }
 
@@ -228,6 +266,69 @@
         id is Guid value ? categories?.FirstOrDefault(category => category.Id == value)?.Name : null;
 
     private static string Icon(string? name) => name is not null && Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
+
+    // ---- Tags (per line) ----
+
+    private TagListItem? TagById(Guid id) => allTags.FirstOrDefault(tag => tag.Id == id);
+
+    // Picker set for a line: global tags ∪ tags scoped to the line's chosen category (0009 D4).
+    private IEnumerable<TagListItem> CompatibleTags(Guid? categoryId) =>
+        allTags.Where(tag => tag.Scope is null || tag.Scope == categoryId);
+
+    private void ToggleTagPicker(int index)
+    {
+        expandedTagLine = expandedTagLine == index ? null : index;
+        newTagText = string.Empty;
+        newTagGlobal = false;
+    }
+
+    private void ToggleTag(int index, Guid tagId)
+    {
+        var tags = lines[index].TagIds;
+        if (!tags.Remove(tagId))
+        {
+            tags.Add(tagId);
+        }
+    }
+
+    // A scoped tag whose category no longer matches the line is dropped; globals always stay (mirrors the
+    // currency re-round in 0008 — the structure can't carry an incompatible classifier to submit).
+    private void DropIncompatibleTags(LineRow line) =>
+        line.TagIds.RemoveAll(id => TagById(id)?.Scope is Guid scope && scope != line.CategoryId);
+
+    private async Task CreateInlineTag(int index)
+    {
+        var name = newTagText.Trim();
+        if (name.Length == 0)
+        {
+            return;
+        }
+
+        var line = lines[index];
+        Guid? scope = newTagGlobal ? null : line.CategoryId;
+        if (!newTagGlobal && scope is null)
+        {
+            error = "Pick a category first to scope the tag, or mark it global.";
+            return;
+        }
+
+        try
+        {
+            var id = await Api.CreateTagAsync(new CreateTagRequest(name, scope));
+            allTags = await Queries.ListTagsAsync();
+            if (!line.TagIds.Contains(id))
+            {
+                line.TagIds.Add(id);
+            }
+
+            newTagText = string.Empty;
+            newTagGlobal = false;
+        }
+        catch (DomainException ex)
+        {
+            error = ex.Message;
+        }
+    }
 
     // ---- Lines ----
 
@@ -243,6 +344,11 @@
         if (expandedCatLine == index)
         {
             expandedCatLine = null;
+        }
+
+        if (expandedTagLine == index)
+        {
+            expandedTagLine = null;
         }
 
         if (activeSuggestKey is not null)
@@ -345,6 +451,17 @@
             line.Unit = suggestion.Unit;
         }
 
+        // Pre-select the remembered tags that are still scope-compatible with the (possibly user-pinned)
+        // category; an incompatible remembered tag is silently dropped.
+        foreach (var tagId in suggestion.TagIds)
+        {
+            var tag = TagById(tagId);
+            if (tag is not null && (tag.Scope is null || tag.Scope == line.CategoryId) && !line.TagIds.Contains(tagId))
+            {
+                line.TagIds.Add(tagId);
+            }
+        }
+
         ClearSuggestions();
     }
 
@@ -376,6 +493,7 @@
         if (categories.Any(category => category.Id == id))
         {
             line.CategoryId = id;
+            DropIncompatibleTags(line);
         }
     }
 
@@ -422,6 +540,7 @@
             lines.Clear();
             lines.Add(NewLine());
             expandedCatLine = null;
+            expandedTagLine = null;
         }
         catch (DomainException ex)
         {
@@ -480,7 +599,9 @@
                 quantityUnit = line.Unit;
             }
 
-            dtos.Add(new ExpenseLineDto(description, categoryId, amount, quantityValue, quantityUnit));
+            dtos.Add(new ExpenseLineDto(
+                description, categoryId, amount, quantityValue, quantityUnit,
+                line.TagIds.Count > 0 ? line.TagIds.ToList() : null));
         }
 
         return dtos.Count > 0;

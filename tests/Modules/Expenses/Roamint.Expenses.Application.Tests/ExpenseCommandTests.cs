@@ -23,9 +23,9 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_persists_returns_id_and_saves_once()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         var id = await handler.HandleAsync(
             new RecordExpense("AMD", Today, [Line("Lunch", food.Id, 1500m)], "lunch"),
@@ -45,10 +45,10 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_keeps_per_line_categories_and_quantity()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
         var hygiene = categories.Seed(Category.Create(CategoryId.New(Clock), "Hygiene"));
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
         var lines = new List<ExpenseLineInput>
         {
             Line("Apple", food.Id, 400m, 500m, QuantityUnit.Grams),
@@ -70,8 +70,8 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_with_no_lines_throws_domain()
     {
-        var (expenses, categories, uow) = NewStore();
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var (expenses, categories, tags, uow) = NewStore();
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<DomainException>(() => handler.HandleAsync(
             new RecordExpense("USD", Today, []),
@@ -82,9 +82,9 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_quantity_with_value_but_no_unit_throws_domain()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<DomainException>(() => handler.HandleAsync(
             new RecordExpense("USD", Today, [Line("Apple", food.Id, 5m, qtyValue: 500m)]),
@@ -95,8 +95,8 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_missing_category_throws_not_found()
     {
-        var (expenses, categories, uow) = NewStore();
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var (expenses, categories, tags, uow) = NewStore();
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<CategoryNotFoundException>(() => handler.HandleAsync(
             new RecordExpense("USD", Today, [Line("Apple", CategoryId.New(Clock), 10m)]),
@@ -107,11 +107,11 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_archived_category_throws_domain()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var archived = Category.Create(CategoryId.New(Clock), "Old");
         archived.Archive();
         categories.Seed(archived);
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<DomainException>(() => handler.HandleAsync(
             new RecordExpense("USD", Today, [Line("Apple", archived.Id, 10m)]),
@@ -122,9 +122,9 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task RecordExpense_unknown_currency_throws_domain()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
-        var handler = new RecordExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new RecordExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<DomainException>(() => handler.HandleAsync(
             new RecordExpense("EUR", Today, [Line("Apple", food.Id, 10m)]),
@@ -134,8 +134,8 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task CorrectExpense_missing_throws_not_found()
     {
-        var (expenses, categories, uow) = NewStore();
-        var handler = new CorrectExpenseHandler(expenses, categories, uow, Clock);
+        var (expenses, categories, tags, uow) = NewStore();
+        var handler = new CorrectExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<ExpenseNotFoundException>(() => handler.HandleAsync(
             new CorrectExpense(ExpenseId.New(Clock), "USD", Today, [Line("Apple", CategoryId.New(Clock), 5m)]),
@@ -145,11 +145,11 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task CorrectExpense_replaces_lines_and_saves()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
         var expense = expenses.Seed(Expense.Record(
             ExpenseId.New(Clock), Today, [Draft(food.Id, 100m, Currency.Usd)], Clock));
-        var handler = new CorrectExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new CorrectExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await handler.HandleAsync(
             new CorrectExpense(expense.Id, "USD", Today, [Line("Bread", food.Id, 120m), Line("Milk", food.Id, 80m)], "fixed"),
@@ -165,14 +165,14 @@ public sealed class ExpenseCommandTests
     [Fact]
     public async Task CorrectExpense_archived_category_throws_domain()
     {
-        var (expenses, categories, uow) = NewStore();
+        var (expenses, categories, tags, uow) = NewStore();
         var food = categories.Seed(Category.Create(CategoryId.New(Clock), "Food"));
         var archived = Category.Create(CategoryId.New(Clock), "Old");
         archived.Archive();
         categories.Seed(archived);
         var expense = expenses.Seed(Expense.Record(
             ExpenseId.New(Clock), Today, [Draft(food.Id, 100m, Currency.Usd)], Clock));
-        var handler = new CorrectExpenseHandler(expenses, categories, uow, Clock);
+        var handler = new CorrectExpenseHandler(expenses, categories, tags, uow, Clock);
 
         await Should.ThrowAsync<DomainException>(() => handler.HandleAsync(
             new CorrectExpense(expense.Id, "USD", Today, [Line("Apple", archived.Id, 50m)]),
@@ -180,6 +180,6 @@ public sealed class ExpenseCommandTests
         uow.SaveCount.ShouldBe(0);
     }
 
-    private static (InMemoryExpenseRepository, InMemoryCategoryRepository, FakeUnitOfWork) NewStore() =>
-        (new InMemoryExpenseRepository(), new InMemoryCategoryRepository(), new FakeUnitOfWork());
+    private static (InMemoryExpenseRepository, InMemoryCategoryRepository, InMemoryTagRepository, FakeUnitOfWork) NewStore() =>
+        (new InMemoryExpenseRepository(), new InMemoryCategoryRepository(), new InMemoryTagRepository(), new FakeUnitOfWork());
 }

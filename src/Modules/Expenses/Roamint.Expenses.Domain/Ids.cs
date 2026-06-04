@@ -17,3 +17,9 @@ public readonly record struct ExpenseLineId(Guid Value)
 {
     public static ExpenseLineId New(TimeProvider clock) => new(Guid.CreateVersion7(clock.GetUtcNow()));
 }
+
+/// <summary>Identity of a <see cref="Tag"/> aggregate.</summary>
+public readonly record struct TagId(Guid Value)
+{
+    public static TagId New(TimeProvider clock) => new(Guid.CreateVersion7(clock.GetUtcNow()));
+}

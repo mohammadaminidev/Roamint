@@ -20,6 +20,7 @@ public static class ExpensesPersistence
         builder.AddNpgsqlDbContext<ExpensesDbContext>("roamintdb");
 
         builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+        builder.Services.AddScoped<ITagRepository, TagRepository>();
         builder.Services.AddScoped<IExpenseRepository, ExpenseRepository>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 

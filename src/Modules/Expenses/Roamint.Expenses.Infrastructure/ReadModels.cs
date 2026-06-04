@@ -29,6 +29,32 @@ internal sealed class ListActiveCategoriesHandler(ExpensesDbContext db)
 }
 
 /// <summary>
+/// Read model for the tag list. With no category filter it returns every active tag (management); with one
+/// it returns the picker set for a line of that category — global tags ∪ tags scoped to it (0009 D4).
+/// </summary>
+internal sealed class ListTagsHandler(ExpensesDbContext db)
+    : IQueryHandler<ListTags, IReadOnlyList<TagView>>
+{
+    public async Task<IReadOnlyList<TagView>> HandleAsync(ListTags query, CancellationToken ct)
+    {
+        var tags = db.Tags.AsNoTracking().Where(tag => tag.Status == TagStatus.Active);
+
+        if (query.CategoryFilter is Guid categoryId)
+        {
+            var scope = new CategoryId(categoryId);
+            tags = tags.Where(tag => tag.Scope == null || tag.Scope == scope);
+        }
+
+        var rows = await tags
+            .OrderBy(tag => tag.Name)
+            .Select(tag => new { tag.Id, tag.Name, tag.Scope })
+            .ToListAsync(ct);
+
+        return rows.Select(row => new TagView(row.Id.Value, row.Name, row.Scope?.Value)).ToList();
+    }
+}
+
+/// <summary>
 /// Autocomplete over item history. The corpus is the distinct line descriptions; each suggestion carries
 /// the category and quantity unit last used with that text so the UI can fill the field, light the chip,
 /// and pre-select the unit in one round trip. Filtering is an <c>ILIKE %text%</c> in SQL; prefix-vs-contains
@@ -58,10 +84,11 @@ internal sealed class SuggestItemsHandler(ExpensesDbContext db)
                     line.CategoryId,
                     line.Quantity != null ? line.Quantity.Unit : (QuantityUnit?)null,
                     expense.OccurredOn,
-                    expense.Id)))
+                    expense.Id,
+                    line.Id)))
             .ToListAsync(ct);
 
-        return rows
+        var winners = rows
             .GroupBy(candidate => candidate.Text, StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
@@ -76,15 +103,44 @@ internal sealed class SuggestItemsHandler(ExpensesDbContext db)
             .ThenByDescending(entry => entry.mostRecent.OccurredOn)
             .ThenByDescending(entry => entry.mostRecent.ExpenseId.Value)
             .Take(query.Limit)
-            .Select(entry => new ItemSuggestionView(
-                entry.mostRecent.Text,
-                entry.mostRecent.CategoryId.Value,
-                entry.mostRecent.Unit?.ToCode()))
+            .Select(entry => entry.mostRecent)
+            .ToList();
+
+        var tagsByLine = await LoadTagsAsync(winners.Select(winner => winner.LineId).ToList(), ct);
+
+        return winners
+            .Select(winner => new ItemSuggestionView(
+                winner.Text,
+                winner.CategoryId.Value,
+                winner.Unit?.ToCode(),
+                tagsByLine.GetValueOrDefault(winner.LineId, [])))
             .ToList();
     }
 
+    /// <summary>Loads the remembered tag ids for the winning lines in one round trip. Owned tag rows come
+    /// along when the line entities are materialized, so we read them via the line's domain accessor.</summary>
+    private async Task<Dictionary<ExpenseLineId, IReadOnlyList<Guid>>> LoadTagsAsync(
+        List<ExpenseLineId> lineIds, CancellationToken ct)
+    {
+        if (lineIds.Count == 0)
+        {
+            return [];
+        }
+
+        var lines = await db.Expenses
+            .AsNoTracking()
+            .SelectMany(expense => expense.Lines)
+            .Where(line => lineIds.Contains(line.Id))
+            .ToListAsync(ct);
+
+        return lines.ToDictionary(
+            line => line.Id,
+            line => (IReadOnlyList<Guid>)line.TagIds.Select(tagId => tagId.Value).ToList());
+    }
+
     private readonly record struct Candidate(
-        string Text, CategoryId CategoryId, QuantityUnit? Unit, DateOnly OccurredOn, ExpenseId ExpenseId);
+        string Text, CategoryId CategoryId, QuantityUnit? Unit, DateOnly OccurredOn, ExpenseId ExpenseId,
+        ExpenseLineId LineId);
 }
 
 /// <summary>

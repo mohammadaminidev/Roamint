@@ -20,6 +20,8 @@ internal sealed class ExpensesDbContext : DbContext
 
     public DbSet<Category> Categories => Set<Category>();
 
+    public DbSet<Tag> Tags => Set<Tag>();
+
     public DbSet<Expense> Expenses => Set<Expense>();
 
     internal DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
@@ -35,6 +37,7 @@ internal sealed class ExpensesDbContext : DbContext
         configurationBuilder.Properties<CategoryId>().HaveConversion<CategoryIdConverter>();
         configurationBuilder.Properties<ExpenseId>().HaveConversion<ExpenseIdConverter>();
         configurationBuilder.Properties<ExpenseLineId>().HaveConversion<ExpenseLineIdConverter>();
+        configurationBuilder.Properties<TagId>().HaveConversion<TagIdConverter>();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

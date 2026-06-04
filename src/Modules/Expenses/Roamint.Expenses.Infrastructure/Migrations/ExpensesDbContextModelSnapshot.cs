@@ -109,6 +109,33 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                     b.ToTable("expense_lines", "expenses");
                 });
 
+            modelBuilder.Entity("Roamint.Expenses.Domain.Tag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("Scope")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_category_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("tags", "expenses");
+                });
+
             modelBuilder.Entity("Roamint.Expenses.Infrastructure.Outbox.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -176,7 +203,26 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                                 .HasForeignKey("ExpenseLineId");
                         });
 
+                    b.OwnsMany("Roamint.Expenses.Domain.LineTag", "Tags", b1 =>
+                        {
+                            b1.Property<Guid>("expense_line_id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<Guid>("TagId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("tag_id");
+
+                            b1.HasKey("expense_line_id", "TagId");
+
+                            b1.ToTable("expense_line_tags", "expenses");
+
+                            b1.WithOwner()
+                                .HasForeignKey("expense_line_id");
+                        });
+
                     b.Navigation("Quantity");
+
+                    b.Navigation("Tags");
                 });
 
             modelBuilder.Entity("Roamint.Expenses.Domain.Expense", b =>

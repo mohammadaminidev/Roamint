@@ -8,14 +8,24 @@ public sealed record CategoryView(Guid Id, string Name);
 /// <summary>Lists active (non-archived) categories, name-ordered. Handled by a read model in Infrastructure.</summary>
 public sealed record ListActiveCategories : IQuery<IReadOnlyList<CategoryView>>;
 
+/// <summary>Read projection of an active tag. <c>Scope</c> is null for a global tag.</summary>
+public sealed record TagView(Guid Id, string Name, Guid? Scope);
+
 /// <summary>
-/// One autocomplete suggestion for an item: the historical line text plus the category and quantity unit
-/// last used with it, so picking it can fill the field, light the matching chip, and pre-select the unit
-/// in one payload. <c>CategoryId</c> is null only if the source line somehow had no category (the schema
-/// disallows it); <c>Unit</c> is the canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>) or null when the
-/// remembered line carried no quantity.
+/// Lists active tags, name-ordered. With <c>CategoryFilter</c> set, returns the picker set for a line of
+/// that category — global tags ∪ tags scoped to it. With it null, returns every active tag (management).
+/// Read model in Infrastructure.
 /// </summary>
-public sealed record ItemSuggestionView(string Text, Guid? CategoryId, string? Unit);
+public sealed record ListTags(Guid? CategoryFilter) : IQuery<IReadOnlyList<TagView>>;
+
+/// <summary>
+/// One autocomplete suggestion for an item: the historical line text plus the category, quantity unit, and
+/// tags last used with it, so picking it can fill the field, light the matching chip, pre-select the unit,
+/// and pre-select its tags in one payload. <c>CategoryId</c> is null only if the source line somehow had no
+/// category (the schema disallows it); <c>Unit</c> is the canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>)
+/// or null when the remembered line carried no quantity; <c>TagIds</c> is the remembered line's tag set.
+/// </summary>
+public sealed record ItemSuggestionView(string Text, Guid? CategoryId, string? Unit, IReadOnlyList<Guid> TagIds);
 
 /// <summary>
 /// Autocomplete over prior item text — distinct line descriptions matching <c>Prefix</c> (prefix matches

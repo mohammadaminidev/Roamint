@@ -75,5 +75,18 @@ internal sealed class ExpenseLineConfiguration : IEntityTypeConfiguration<Expens
         });
 
         builder.Navigation(line => line.Quantity).IsRequired(false);
+
+        // Tags applied to the line → join table expenses.expense_line_tags, owned by the line (cascade with
+        // it). tag_id is a plain converted id column with no DB FK to tags and no navigation to the Tag
+        // aggregate — the reference-other-aggregates-by-id rule (0009 C1/D2).
+        builder.OwnsMany(line => line.Tags, tag =>
+        {
+            tag.ToTable("expense_line_tags");
+            tag.WithOwner().HasForeignKey("expense_line_id");
+            tag.Property(lineTag => lineTag.TagId).HasColumnName("tag_id");
+            tag.HasKey("expense_line_id", "TagId");
+        });
+
+        builder.Navigation(line => line.Tags).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

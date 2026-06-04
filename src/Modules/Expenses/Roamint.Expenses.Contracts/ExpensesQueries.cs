@@ -13,11 +13,17 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
         return categories.Select(category => new CategoryListItem(category.Id, category.Name)).ToList();
     }
 
+    public async Task<IReadOnlyList<TagListItem>> ListTagsAsync(Guid? categoryFilter = null, CancellationToken ct = default)
+    {
+        var tags = await queries.QueryAsync(new ListTags(categoryFilter), ct);
+        return tags.Select(tag => new TagListItem(tag.Id, tag.Name, tag.Scope)).ToList();
+    }
+
     public async Task<IReadOnlyList<ItemSuggestion>> SuggestItemsAsync(string prefix, int limit, CancellationToken ct = default)
     {
         var suggestions = await queries.QueryAsync(new SuggestItems(prefix, limit), ct);
         return suggestions
-            .Select(suggestion => new ItemSuggestion(suggestion.Text, suggestion.CategoryId, suggestion.Unit))
+            .Select(suggestion => new ItemSuggestion(suggestion.Text, suggestion.CategoryId, suggestion.Unit, suggestion.TagIds))
             .ToList();
     }
 

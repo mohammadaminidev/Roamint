@@ -75,6 +75,50 @@ public sealed class SuggestItemsHandlerTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task Carries_remembered_tags_from_the_most_recent_line()
+    {
+        var tag = $"SIT{Guid.NewGuid():N}";
+        var clock = Clock();
+        var groceries = CategoryId.New(clock);
+        var fruit = TagId.New(clock);
+        var happiness = TagId.New(clock);
+
+        await using (var db = fixture.CreateContext(clock))
+        {
+            db.Categories.Add(Category.Create(groceries, $"{tag} Groceries"));
+            db.Tags.Add(Tag.Create(fruit, $"{tag} Fruit", groceries));
+            db.Tags.Add(Tag.Create(happiness, $"{tag} Happiness"));
+
+            // Earlier occurrence with one tag; later occurrence wins with two — those are remembered.
+            db.Expenses.Add(Expense.Record(
+                ExpenseId.New(clock), new DateOnly(2026, 4, 10),
+                [new ExpenseLineDraft($"{tag} Apple", groceries, Money.Of(2m, Usd), null, new HashSet<TagId> { fruit })],
+                clock));
+            db.Expenses.Add(Expense.Record(
+                ExpenseId.New(clock), new DateOnly(2026, 4, 20),
+                [new ExpenseLineDraft($"{tag} Apple", groceries, Money.Of(2m, Usd), null, new HashSet<TagId> { fruit, happiness })],
+                clock));
+
+            // A different item with no tags → empty remembered set.
+            db.Expenses.Add(Expense.Record(
+                ExpenseId.New(clock), new DateOnly(2026, 4, 21), [Draft($"{tag} Plain", groceries)], clock));
+
+            await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using (var db = fixture.CreateContext(clock))
+        {
+            var handler = new SuggestItemsHandler(db);
+            var results = await handler.HandleAsync(new SuggestItems(tag, 10), TestContext.Current.CancellationToken);
+
+            var apple = results.Single(r => r.Text == $"{tag} Apple");
+            apple.TagIds.ShouldBe([fruit.Value, happiness.Value], ignoreOrder: true);
+
+            results.Single(r => r.Text == $"{tag} Plain").TagIds.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
     public async Task Caps_results_at_the_requested_limit()
     {
         var tag = $"SIL{Guid.NewGuid():N}";

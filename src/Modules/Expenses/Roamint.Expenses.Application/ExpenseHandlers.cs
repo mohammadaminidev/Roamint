@@ -7,6 +7,7 @@ namespace Roamint.Expenses.Application;
 internal sealed class RecordExpenseHandler(
     IExpenseRepository expenses,
     ICategoryRepository categories,
+    ITagRepository tags,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<RecordExpense, ExpenseId>
 {
@@ -16,6 +17,7 @@ internal sealed class RecordExpenseHandler(
 
         var currency = Currency.FromCode(command.CurrencyCode);
         await EnsureActiveCategoriesAsync(categories, command.Lines, ct);
+        await EnsureCompatibleTagsAsync(tags, command.Lines, ct);
 
         var id = ExpenseId.New(clock);
         var expense = Expense.Record(
@@ -51,6 +53,51 @@ internal sealed class RecordExpenseHandler(
         }
     }
 
+    /// <summary>Validates every tag referenced by the lines exists, is active, and is scope-compatible with
+    /// its line's category. Mirrors <see cref="EnsureActiveCategoriesAsync"/> and runs on both Record and
+    /// Correct; the distinct referenced tags are loaded in one round trip.</summary>
+    internal static async Task EnsureCompatibleTagsAsync(
+        ITagRepository tags,
+        IReadOnlyList<ExpenseLineInput> lines,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+
+        var referenced = lines
+            .SelectMany(line => line.TagIds ?? [])
+            .Distinct()
+            .ToList();
+        if (referenced.Count == 0)
+        {
+            return;
+        }
+
+        var loaded = await tags.GetManyAsync(referenced, ct);
+        var byId = loaded.ToDictionary(tag => tag.Id);
+
+        foreach (var line in lines)
+        {
+            foreach (var tagId in line.TagIds ?? [])
+            {
+                if (!byId.TryGetValue(tagId, out var tag))
+                {
+                    throw new TagNotFoundException(tagId);
+                }
+
+                if (tag.Status == TagStatus.Archived)
+                {
+                    throw new DomainException($"Tag '{tag.Name}' is archived and cannot be applied.");
+                }
+
+                if (!tag.AppliesTo(line.CategoryId))
+                {
+                    throw new DomainException(
+                        $"Tag '{tag.Name}' is scoped to a different category and cannot sit on this line.");
+                }
+            }
+        }
+    }
+
     internal static IEnumerable<ExpenseLineDraft> ToDrafts(
         IReadOnlyList<ExpenseLineInput> lines,
         Currency currency)
@@ -61,7 +108,8 @@ internal sealed class RecordExpenseHandler(
             line.Description,
             line.CategoryId,
             Money.Of(line.Amount, currency),
-            ToQuantity(line)));
+            ToQuantity(line),
+            line.TagIds is null ? null : line.TagIds.ToHashSet()));
     }
 
     private static Quantity? ToQuantity(ExpenseLineInput line)
@@ -83,6 +131,7 @@ internal sealed class RecordExpenseHandler(
 internal sealed class CorrectExpenseHandler(
     IExpenseRepository expenses,
     ICategoryRepository categories,
+    ITagRepository tags,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<CorrectExpense>
 {
@@ -95,6 +144,7 @@ internal sealed class CorrectExpenseHandler(
 
         var currency = Currency.FromCode(command.CurrencyCode);
         await RecordExpenseHandler.EnsureActiveCategoriesAsync(categories, command.Lines, ct);
+        await RecordExpenseHandler.EnsureCompatibleTagsAsync(tags, command.Lines, ct);
 
         expense.Correct(
             command.OccurredOn,

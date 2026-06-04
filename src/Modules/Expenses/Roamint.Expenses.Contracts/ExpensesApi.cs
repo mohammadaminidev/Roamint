@@ -23,6 +23,20 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
     public Task ArchiveCategoryAsync(Guid categoryId, CancellationToken ct = default) =>
         commands.SendAsync(new ArchiveCategory(new CategoryId(categoryId)), ct);
 
+    public async Task<Guid> CreateTagAsync(CreateTagRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var scope = request.Scope is Guid value ? new CategoryId(value) : (CategoryId?)null;
+        var id = await commands.SendAsync(new CreateTag(request.Name, scope), ct);
+        return id.Value;
+    }
+
+    public Task RenameTagAsync(Guid tagId, string newName, CancellationToken ct = default) =>
+        commands.SendAsync(new RenameTag(new TagId(tagId), newName), ct);
+
+    public Task ArchiveTagAsync(Guid tagId, CancellationToken ct = default) =>
+        commands.SendAsync(new ArchiveTag(new TagId(tagId)), ct);
+
     public async Task<Guid> RecordExpenseAsync(RecordExpenseRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -57,6 +71,7 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
             new CategoryId(line.CategoryId),
             line.Amount,
             line.QuantityValue,
-            line.QuantityUnit is null ? null : QuantityUnits.FromCode(line.QuantityUnit))).ToList();
+            line.QuantityUnit is null ? null : QuantityUnits.FromCode(line.QuantityUnit),
+            line.TagIds?.Select(id => new TagId(id)).ToList())).ToList();
     }
 }

@@ -16,6 +16,11 @@ internal sealed class ExpensesMigrationService(IServiceProvider services, IHostE
     private static readonly string[] StarterCategories =
         ["Food", "Transport", "Rent", "Groceries", "Utilities"];
 
+    // Anonymized starter tags (0009 seed set): scoped sub-classifications of Groceries, plus globals.
+    private const string ScopedTagCategory = "Groceries";
+    private static readonly string[] ScopedStarterTags = ["Fruit", "Vegetables", "Dairy"];
+    private static readonly string[] GlobalStarterTags = ["For Happiness", "Gift", "Essential"];
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         if (!environment.IsDevelopment())
@@ -25,27 +30,55 @@ internal sealed class ExpensesMigrationService(IServiceProvider services, IHostE
 
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<ExpensesDbContext>();
+        var clock = scope.ServiceProvider.GetRequiredService<TimeProvider>();
         await db.Database.MigrateAsync(cancellationToken);
 
-        await SeedStarterCategoriesAsync(db, scope.ServiceProvider, cancellationToken);
+        var categories = await SeedStarterCategoriesAsync(db, clock, cancellationToken);
+        await SeedStarterTagsAsync(db, clock, categories, cancellationToken);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private static async Task SeedStarterCategoriesAsync(
+    private static async Task<IReadOnlyDictionary<string, Category>> SeedStarterCategoriesAsync(
         ExpensesDbContext db,
-        IServiceProvider provider,
+        TimeProvider clock,
         CancellationToken ct)
     {
         if (await db.Categories.AnyAsync(ct))
         {
+            return await db.Categories.ToDictionaryAsync(category => category.Name, ct);
+        }
+
+        var created = StarterCategories.ToDictionary(
+            name => name,
+            name => Category.Create(CategoryId.New(clock), name));
+        db.Categories.AddRange(created.Values);
+        await db.SaveChangesAsync(ct);
+        return created;
+    }
+
+    private static async Task SeedStarterTagsAsync(
+        ExpensesDbContext db,
+        TimeProvider clock,
+        IReadOnlyDictionary<string, Category> categories,
+        CancellationToken ct)
+    {
+        if (await db.Tags.AnyAsync(ct))
+        {
             return;
         }
 
-        var clock = provider.GetRequiredService<TimeProvider>();
-        foreach (var name in StarterCategories)
+        if (categories.TryGetValue(ScopedTagCategory, out var groceries))
         {
-            db.Categories.Add(Category.Create(CategoryId.New(clock), name));
+            foreach (var name in ScopedStarterTags)
+            {
+                db.Tags.Add(Tag.Create(TagId.New(clock), name, groceries.Id));
+            }
+        }
+
+        foreach (var name in GlobalStarterTags)
+        {
+            db.Tags.Add(Tag.Create(TagId.New(clock), name, scope: null));
         }
 
         await db.SaveChangesAsync(ct);

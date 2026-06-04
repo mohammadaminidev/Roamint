@@ -9,6 +9,12 @@ public interface IExpensesQueries
     Task<IReadOnlyList<CategoryListItem>> ListActiveCategoriesAsync(CancellationToken ct = default);
 
     /// <summary>
+    /// Active tags for selection. With <paramref name="categoryFilter"/> set, returns the picker set for a
+    /// line of that category — global tags ∪ tags scoped to it. With it null, returns every active tag.
+    /// </summary>
+    Task<IReadOnlyList<TagListItem>> ListTagsAsync(Guid? categoryFilter = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Autocomplete over prior item text (line descriptions) matching <paramref name="prefix"/>, each
     /// carrying the category and quantity unit last used with it so a pick can fill the field, light the
     /// chip, and pre-select the unit without a second call.
@@ -25,6 +31,9 @@ public interface IExpensesQueries
 
 public sealed record CategoryListItem(Guid Id, string Name);
 
-/// <summary>An autocomplete suggestion: the historical item text plus the category and quantity unit
-/// (canonical code, or null) last used with it.</summary>
-public sealed record ItemSuggestion(string Text, Guid? CategoryId, string? Unit);
+/// <summary>A selectable tag. <see cref="Scope"/> is null for a global tag, else the category it's scoped to.</summary>
+public sealed record TagListItem(Guid Id, string Name, Guid? Scope);
+
+/// <summary>An autocomplete suggestion: the historical item text plus the category, quantity unit (canonical
+/// code, or null), and the tags last used with it.</summary>
+public sealed record ItemSuggestion(string Text, Guid? CategoryId, string? Unit, IReadOnlyList<Guid> TagIds);

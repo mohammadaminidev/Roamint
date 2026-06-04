@@ -10,6 +10,21 @@ public interface ICategoryRepository
     Task AddAsync(Category category, CancellationToken ct);
 }
 
+/// <summary>Write-side access to the <see cref="Tag"/> aggregate.</summary>
+public interface ITagRepository
+{
+    Task<Tag?> GetAsync(TagId id, CancellationToken ct);
+
+    /// <summary>Batch-load the referenced tags (scope validation loads all of a line set's tags at once).</summary>
+    Task<IReadOnlyList<Tag>> GetManyAsync(IReadOnlyCollection<TagId> ids, CancellationToken ct);
+
+    /// <summary>The active tag matching <paramref name="name"/> (case-insensitive) within
+    /// <paramref name="scope"/>, or null — backs per-scope uniqueness and idempotent create.</summary>
+    Task<Tag?> FindActiveByNameAsync(string name, CategoryId? scope, CancellationToken ct);
+
+    Task AddAsync(Tag tag, CancellationToken ct);
+}
+
 /// <summary>Write-side access to the <see cref="Expense"/> aggregate.</summary>
 public interface IExpenseRepository
 {

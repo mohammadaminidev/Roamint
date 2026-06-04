@@ -15,6 +15,9 @@ internal static class OutboxEventTypes
         [typeof(CategoryCreated)] = "expenses.category-created",
         [typeof(CategoryRenamed)] = "expenses.category-renamed",
         [typeof(CategoryArchived)] = "expenses.category-archived",
+        [typeof(TagCreated)] = "expenses.tag-created",
+        [typeof(TagRenamed)] = "expenses.tag-renamed",
+        [typeof(TagArchived)] = "expenses.tag-archived",
         [typeof(ExpenseRecorded)] = "expenses.expense-recorded",
         [typeof(ExpenseCorrected)] = "expenses.expense-corrected",
     };

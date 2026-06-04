@@ -13,6 +13,14 @@ public interface IExpensesApi
 
     Task ArchiveCategoryAsync(Guid categoryId, CancellationToken ct = default);
 
+    /// <summary>Creates a tag (scope null = global; non-null = scoped to that category) and returns its id.
+    /// Idempotent on the active (name, scope) pair — a collision returns the existing tag's id.</summary>
+    Task<Guid> CreateTagAsync(CreateTagRequest request, CancellationToken ct = default);
+
+    Task RenameTagAsync(Guid tagId, string newName, CancellationToken ct = default);
+
+    Task ArchiveTagAsync(Guid tagId, CancellationToken ct = default);
+
     Task<Guid> RecordExpenseAsync(RecordExpenseRequest request, CancellationToken ct = default);
 
     Task CorrectExpenseAsync(Guid expenseId, CorrectExpenseRequest request, CancellationToken ct = default);
@@ -20,18 +28,23 @@ public interface IExpensesApi
 
 public sealed record CreateCategoryRequest(string Name);
 
+/// <summary>A tag to create. <see cref="Scope"/> null = global; non-null = scoped to that category.</summary>
+public sealed record CreateTagRequest(string Name, Guid? Scope);
+
 /// <summary>
 /// A line item on a record/correct request. The item is the categorized unit, so each line carries its
 /// own <see cref="CategoryId"/> and the <see cref="Amount"/> paid. <see cref="QuantityValue"/> /
 /// <see cref="QuantityUnit"/> are optional and travel together — supply both or neither; the unit is the
-/// canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>).
+/// canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>). <see cref="TagIds"/> are the 0..n tags applied to
+/// the line; each must be active and scope-compatible with <see cref="CategoryId"/>.
 /// </summary>
 public sealed record ExpenseLineDto(
     string Description,
     Guid CategoryId,
     decimal Amount,
     decimal? QuantityValue = null,
-    string? QuantityUnit = null);
+    string? QuantityUnit = null,
+    IReadOnlyList<Guid>? TagIds = null);
 
 public sealed record RecordExpenseRequest(
     string CurrencyCode,

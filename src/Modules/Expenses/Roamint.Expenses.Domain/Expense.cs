@@ -3,7 +3,27 @@ using Roamint.SharedKernel;
 namespace Roamint.Expenses.Domain;
 
 /// <summary>Input shape for a line item; the aggregate turns it into an owned <see cref="ExpenseLine"/>.</summary>
-public sealed record ExpenseLineDraft(string Description, CategoryId CategoryId, Money Amount, Quantity? Quantity = null);
+public sealed record ExpenseLineDraft(
+    string Description,
+    CategoryId CategoryId,
+    Money Amount,
+    Quantity? Quantity = null,
+    IReadOnlySet<TagId>? TagIds = null);
+
+/// <summary>
+/// A tag applied to an <see cref="ExpenseLine"/> — a join row owned by the line. It references the
+/// <see cref="Tag"/> aggregate by id only (no navigation), per the reference-other-aggregates-by-id rule;
+/// scope/active compatibility is validated in the command handler that has the Tag repository.
+/// </summary>
+public sealed class LineTag
+{
+    // EF / serialization constructor.
+    private LineTag() { }
+
+    internal LineTag(TagId tagId) => TagId = tagId;
+
+    public TagId TagId { get; private init; }
+}
 
 /// <summary>
 /// A line item owned by an <see cref="Expense"/>. The item is the categorized unit: it carries its own
@@ -13,11 +33,19 @@ public sealed class ExpenseLine : Entity<ExpenseLineId>
 {
     public const int MaxDescriptionLength = 200;
 
+    private readonly List<LineTag> _tags = [];
+
     // EF / serialization constructor; not for domain use. EF binds the key here and sets the mapped
-    // members (which include the complex Amount and owned Quantity) through their backing fields.
+    // members (which include the complex Amount, owned Quantity, and owned Tags) through their backing fields.
     private ExpenseLine(ExpenseLineId id) : base(id) { }
 
-    internal ExpenseLine(ExpenseLineId id, string description, CategoryId categoryId, Money amount, Quantity? quantity)
+    internal ExpenseLine(
+        ExpenseLineId id,
+        string description,
+        CategoryId categoryId,
+        Money amount,
+        Quantity? quantity,
+        IReadOnlySet<TagId>? tagIds)
         : base(id)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
@@ -36,6 +64,13 @@ public sealed class ExpenseLine : Entity<ExpenseLineId>
         CategoryId = categoryId;
         Amount = amount;
         Quantity = quantity;
+        if (tagIds is not null)
+        {
+            foreach (var tagId in tagIds)
+            {
+                _tags.Add(new LineTag(tagId));
+            }
+        }
     }
 
     public string Description { get; } = string.Empty;
@@ -46,6 +81,12 @@ public sealed class ExpenseLine : Entity<ExpenseLineId>
     public Money Amount { get; }
 
     public Quantity? Quantity { get; }
+
+    /// <summary>The owned join rows — the read/query path (EF navigation). Domain logic uses <see cref="TagIds"/>.</summary>
+    public IReadOnlyCollection<LineTag> Tags => _tags.AsReadOnly();
+
+    /// <summary>The tags applied to this line (0..n), as the set the domain reasons about.</summary>
+    public IReadOnlySet<TagId> TagIds => _tags.Select(tag => tag.TagId).ToHashSet();
 }
 
 /// <summary>
@@ -124,7 +165,8 @@ public sealed class Expense : AggregateRoot<ExpenseId>
                 draft.Description,
                 draft.CategoryId,
                 draft.Amount,
-                draft.Quantity));
+                draft.Quantity,
+                draft.TagIds));
         }
 
         if (lines.Count == 0)

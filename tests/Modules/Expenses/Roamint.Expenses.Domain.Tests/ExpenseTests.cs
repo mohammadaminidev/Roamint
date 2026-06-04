@@ -112,6 +112,23 @@ public class ExpenseTests
     }
 
     [Fact]
+    public void Record_carries_optional_line_tags()
+    {
+        var fruit = TagId.New(Clock);
+        var happiness = TagId.New(Clock);
+        var lines = new[]
+        {
+            new ExpenseLineDraft("Apple", Food, Money.Of(400m, Currency.Amd), TagIds: new HashSet<TagId> { fruit, happiness }),
+            new ExpenseLineDraft("Knife", Food, Money.Of(900m, Currency.Amd)),
+        };
+
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, lines, Clock);
+
+        expense.Lines[0].TagIds.ShouldBe(new HashSet<TagId> { fruit, happiness }, ignoreOrder: true);
+        expense.Lines[1].TagIds.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Record_trims_blank_note_to_null()
     {
         var expense = Expense.Record(ExpenseId.New(Clock), Today, [Line("Apple", 5m, Currency.Usd)], Clock, note: "   ");

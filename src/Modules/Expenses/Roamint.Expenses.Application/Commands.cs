@@ -11,17 +11,30 @@ public sealed record RenameCategory(CategoryId CategoryId, string NewName) : ICo
 
 public sealed record ArchiveCategory(CategoryId CategoryId) : ICommand;
 
+// ---- Tag ----
+
+/// <summary>Creates a tag. <paramref name="Scope"/> null = global; non-null = scoped to that category.
+/// Idempotent on the active (name, scope) pair — a collision returns the existing tag's id.</summary>
+public sealed record CreateTag(string Name, CategoryId? Scope) : ICommand<TagId>;
+
+public sealed record RenameTag(TagId TagId, string NewName) : ICommand;
+
+public sealed record ArchiveTag(TagId TagId) : ICommand;
+
 // ---- Expense ----
 
 /// <summary>Input shape for a line item on a command; the handler binds the amount to the expense's
 /// currency and resolves the optional quantity (value + unit, both or neither) before handing it to
-/// the domain. The item is the categorized unit, so the category lives here, not on the expense.</summary>
+/// the domain. The item is the categorized unit, so the category lives here, not on the expense.
+/// <paramref name="TagIds"/> are the 0..n tags applied to the line; the handler validates each is active
+/// and scope-compatible with <paramref name="CategoryId"/>.</summary>
 public sealed record ExpenseLineInput(
     string Description,
     CategoryId CategoryId,
     decimal Amount,
     decimal? QuantityValue = null,
-    QuantityUnit? QuantityUnit = null);
+    QuantityUnit? QuantityUnit = null,
+    IReadOnlyList<TagId>? TagIds = null);
 
 public sealed record RecordExpense(
     string CurrencyCode,

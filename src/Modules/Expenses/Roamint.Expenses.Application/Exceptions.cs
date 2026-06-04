@@ -17,3 +17,10 @@ public sealed class ExpenseNotFoundException(ExpenseId id)
 {
     public ExpenseId ExpenseId { get; } = id;
 }
+
+/// <summary>A referenced <see cref="Tag"/> does not exist.</summary>
+public sealed class TagNotFoundException(TagId id)
+    : DomainException($"Tag '{id.Value}' was not found.")
+{
+    public TagId TagId { get; } = id;
+}

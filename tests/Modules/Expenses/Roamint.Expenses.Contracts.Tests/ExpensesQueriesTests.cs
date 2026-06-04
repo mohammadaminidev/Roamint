@@ -28,6 +28,42 @@ public sealed class ExpensesQueriesTests(ModuleHostFixture fixture)
     }
 
     [Fact]
+    public async Task Creates_tags_filters_picker_by_category_and_records_line_tags_through_the_wiring()
+    {
+        using var scope = fixture.Services.CreateScope();
+        var api = scope.ServiceProvider.GetRequiredService<IExpensesApi>();
+        var queries = scope.ServiceProvider.GetRequiredService<IExpensesQueries>();
+
+        var token = $"Tag-{Guid.NewGuid():N}";
+        var groceries = await api.CreateCategoryAsync(new CreateCategoryRequest($"{token} Groceries"), Ct);
+        var transport = await api.CreateCategoryAsync(new CreateCategoryRequest($"{token} Transport"), Ct);
+
+        var fruit = await api.CreateTagAsync(new CreateTagRequest($"{token} Fruit", groceries), Ct);
+        var gift = await api.CreateTagAsync(new CreateTagRequest($"{token} Gift", null), Ct);
+
+        // Idempotent create: same active (name, scope) returns the existing id (D5 inline-create path).
+        var fruitAgain = await api.CreateTagAsync(new CreateTagRequest($"{token} fruit", groceries), Ct);
+        fruitAgain.ShouldBe(fruit);
+
+        // Picker for a Groceries line: global ∪ scoped-to-Groceries; the Transport-scoped tag is hidden.
+        var commute = await api.CreateTagAsync(new CreateTagRequest($"{token} Commute", transport), Ct);
+        var picker = await queries.ListTagsAsync(groceries, Ct);
+        var mine = picker.Where(tag => tag.Name.StartsWith(token, StringComparison.Ordinal)).Select(tag => tag.Id).ToList();
+        mine.ShouldContain(fruit);
+        mine.ShouldContain(gift);
+        mine.ShouldNotContain(commute);
+
+        // Record a line carrying both tags; the suggestion remembers them.
+        await api.RecordExpenseAsync(
+            new RecordExpenseRequest("USD", new DateOnly(2026, 4, 10),
+                [new ExpenseLineDto($"{token} Apple", groceries, 2.50m, TagIds: [fruit, gift])]), Ct);
+
+        var suggestions = await queries.SuggestItemsAsync($"{token} Apple", 5, Ct);
+        var apple = suggestions.ShouldHaveSingleItem();
+        apple.TagIds.ShouldBe([fruit, gift], ignoreOrder: true);
+    }
+
+    [Fact]
     public async Task Suggests_a_recorded_item_and_its_category_through_the_wiring()
     {
         using var scope = fixture.Services.CreateScope();
