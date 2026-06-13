@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Hosting\Roamint.ServiceDefaults\Roamint.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\Modules\Expenses\Roamint.Expenses.Contracts\Roamint.Expenses.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Wallet\Roamint.Wallet.Contracts\Roamint.Wallet.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

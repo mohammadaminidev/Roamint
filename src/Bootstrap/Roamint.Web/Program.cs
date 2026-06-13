@@ -1,10 +1,12 @@
 using Roamint.Expenses.Contracts;
+using Roamint.Wallet.Contracts;
 using Roamint.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddExpensesModule();
+builder.AddWalletModule();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

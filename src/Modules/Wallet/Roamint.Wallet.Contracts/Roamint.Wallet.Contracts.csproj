@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Roamint.Wallet.Application\Roamint.Wallet.Application.csproj" />
+    <ProjectReference Include="..\Roamint.Wallet.Infrastructure\Roamint.Wallet.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

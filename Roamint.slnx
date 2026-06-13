@@ -12,6 +12,11 @@
     <File Path="docs/features/0003-dispatcher.md" />
     <File Path="docs/features/0004-expenses-application.md" />
     <File Path="docs/features/0005-expenses-infrastructure-contracts.md" />
+    <File Path="docs/features/0006-add-expense-form.md" />
+    <File Path="docs/features/0007-line-items-autocomplete-suggestion.md" />
+    <File Path="docs/features/0008-line-level-categories.md" />
+    <File Path="docs/features/0009-tags.md" />
+    <File Path="docs/features/0010-wallet-rates.md" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
@@ -30,6 +35,12 @@
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Domain/Roamint.Expenses.Domain.csproj" />
     <Project Path="src/Modules/Expenses/Roamint.Expenses.Infrastructure/Roamint.Expenses.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Wallet/">
+    <Project Path="src/Modules/Wallet/Roamint.Wallet.Application/Roamint.Wallet.Application.csproj" />
+    <Project Path="src/Modules/Wallet/Roamint.Wallet.Contracts/Roamint.Wallet.Contracts.csproj" />
+    <Project Path="src/Modules/Wallet/Roamint.Wallet.Domain/Roamint.Wallet.Domain.csproj" />
+    <Project Path="src/Modules/Wallet/Roamint.Wallet.Infrastructure/Roamint.Wallet.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/Shared/">
     <Project Path="tests/Shared/Roamint.Application.Abstractions.Tests/Roamint.Application.Abstractions.Tests.csproj" />
   </Folder>
@@ -38,5 +49,11 @@
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Contracts.Tests/Roamint.Expenses.Contracts.Tests.csproj" />
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Domain.Tests/Roamint.Expenses.Domain.Tests.csproj" />
     <Project Path="tests/Modules/Expenses/Roamint.Expenses.Infrastructure.Tests/Roamint.Expenses.Infrastructure.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Modules/Wallet/">
+    <Project Path="tests/Modules/Wallet/Roamint.Wallet.Application.Tests/Roamint.Wallet.Application.Tests.csproj" />
+    <Project Path="tests/Modules/Wallet/Roamint.Wallet.Contracts.Tests/Roamint.Wallet.Contracts.Tests.csproj" />
+    <Project Path="tests/Modules/Wallet/Roamint.Wallet.Domain.Tests/Roamint.Wallet.Domain.Tests.csproj" />
+    <Project Path="tests/Modules/Wallet/Roamint.Wallet.Infrastructure.Tests/Roamint.Wallet.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

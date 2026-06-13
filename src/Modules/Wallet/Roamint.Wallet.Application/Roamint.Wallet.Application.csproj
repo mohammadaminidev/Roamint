@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Roamint.Wallet.Domain\Roamint.Wallet.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Roamint.Application.Abstractions\Roamint.Application.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Roamint.Wallet.Application.Tests" />
+  </ItemGroup>
+
+</Project>

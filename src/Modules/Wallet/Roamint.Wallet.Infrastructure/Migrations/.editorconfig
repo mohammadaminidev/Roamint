@@ -1,0 +1,4 @@
+# EF Core-scaffolded migrations are generated code; exempt them from the repo's style analyzers
+# (file-scoped namespaces, etc.) so warnings-as-errors doesn't fail on generated output.
+[*.cs]
+generated_code = true
