@@ -23,7 +23,7 @@ Roamint is a single-tenant, multi-currency expense tracker built for personal da
 - **Cross-module communication is via integration events**, dispatched in-process through a **transactional outbox**. Never call across module boundaries directly.
 - **Module layering** (inside each `src/Modules/<Name>/`):
   - `Domain` — aggregates, value objects, domain events; no infrastructure dependencies.
-  - `Application` — command/query/event handlers, validators.
+  - `Application` — command/query/event handlers, validators. **Organize as vertical slices: one file per use case, named after it, holding the command/query *and* its handler together** (e.g. `RecordExpense.cs`, `SetRate.cs`). The folder listing is the use-case inventory. Group slices into per-aggregate subfolders (`Categories/`, `Tags/`, …) **only when a module has enough use cases to warrant it** — a 3-use-case module stays flat; don't add folders-of-one. Subfolders get matching sub-namespaces (`...Application.Categories`); a flat module keeps the single `...Application` namespace. `Ports.cs` (repository/UoW interfaces) and `Exceptions.cs` stay grouped at the root namespace — they're a shared contract surface, not use cases. Pull logic shared by two handlers into a small internal helper (`ExpenseLineBinding`, `RateObservation`) so a slice never reaches into another slice's handler.
   - `Infrastructure` — EF Core mappings, Dapper queries, outbox processor, external clients.
   - `Contracts` — public DTOs + the module's `AddXxxModule(IHostApplicationBuilder)` wiring extension (hangs off the builder so it can use Aspire's `AddNpgsqlDbContext`).
 - The web host only references each module's **`Contracts`** project, never its Domain/Application/Infrastructure.
