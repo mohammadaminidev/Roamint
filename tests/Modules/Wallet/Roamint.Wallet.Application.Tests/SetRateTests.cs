@@ -30,6 +30,22 @@ public sealed class SetRateTests
     }
 
     [Fact]
+    public async Task Sets_a_usd_irt_toman_rate_with_irt_as_quote()
+    {
+        var rates = new InMemoryExchangeRateRepository();
+        var uow = new FakeUnitOfWork();
+        var handler = new SetRateHandler(rates, uow, NewClock());
+
+        await handler.HandleAsync(new SetRate("IRT", 91_000m), TestContext.Current.CancellationToken);
+
+        var rate = rates.All.ShouldHaveSingleItem();
+        rate.Id.ShouldBe(CurrencyPair.Canonical(Currency.Usd, Currency.Irt));
+        rate.Id.ToString().ShouldBe("USD/IRT");
+        rate.Rate.ShouldBe(91_000m);
+        rate.Source.ShouldBe(RateSource.Manual);
+    }
+
+    [Fact]
     public async Task Manual_override_wins_over_an_earlier_exchange_rate()
     {
         var clock = NewClock();

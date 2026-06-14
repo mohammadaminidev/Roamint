@@ -94,8 +94,8 @@
 </div>
 
 @code {
-    private static readonly string[] AllCurrencies = ["USD", "AMD", "USDT"];
-    private static readonly string[] QuoteCurrencies = ["AMD", "USDT"]; // USD is the anchor
+    private static readonly string[] AllCurrencies = ["USD", "AMD", "USDT"]; // transactable wallets only
+    private static readonly string[] QuoteCurrencies = ["AMD", "USDT", "IRT"]; // USD-anchored; IRT display-only
 
     private IReadOnlyList<CurrentRateDto>? rates;
     private DateOnly today;

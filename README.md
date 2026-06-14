@@ -8,9 +8,9 @@ Also a portfolio piece — modular monolith on .NET 10 with .NET Aspire, Blazor 
 
 ## Status
 
-**Solution scaffold — done.** Aspire AppHost orchestrating Postgres (`pgvector/pgvector:pg17`), PgAdmin, and a Blazor Server placeholder. Build is clean, dashboard goes green.
+**V1 in progress.** Expenses (capture, per-line categories, tags, converting list) and Wallet (exchange rates + display conversion) are shipped; monthly summary, category management, and Wallet balances remain. Aspire AppHost orchestrates Postgres (`pgvector/pgvector:pg17`), PgAdmin, and the Blazor Server host. Build is clean, dashboard goes green.
 
-See [`docs/features/0001-solution-scaffold.md`](docs/features/0001-solution-scaffold.md) for the design record.
+See [`docs/features/`](docs/features) for per-slice design records (`0001`–`0011`).
 
 ### V1 roadmap — replace the Excel workflow
 
@@ -18,18 +18,21 @@ See [`docs/features/0001-solution-scaffold.md`](docs/features/0001-solution-scaf
 - [x] Expenses module — domain (Expense, Category) with strongly-typed IDs, EF Core persistence, outbox-backed events (capture done; drain lands with the first consumer)
 - [x] Add-expense form — mobile-first, one-handed thumb input; per-item categories + optional quantities (g/ml/Pcs), derived total, item autocomplete carrying category + unit + tags, category suggestion
 - [x] Tags — scoped (per-category) + global classification axis; managed vocabulary with per-line picker and inline create
-- [ ] Expense list — filter by date range / category / currency
-- [ ] Monthly summary — per-category totals in AMD / USD / IRR (toman) with prior-month delta
+- [x] Exchange rates — `Exchange` + `ExchangeRate` aggregates; USD-triangulated display conversion; manual override
+- [x] Expense list — date-range / category filters; display-denomination conversion ("All" = originals) with missing-rate routing to the rate page
+- [ ] Monthly summary — per-category totals in AMD / USD / IRT (toman) with prior-month delta
 - [ ] Category management — create, rename, archive, merge (no destructive delete)
-- [ ] Exchange-event entry — rate timeline driving per-expense FX equivalents
-- [ ] Wallet view — de-emphasized; computed balances from movements
 
-### V2+ — not yet scoped
+### V2 — not yet scoped
 
 - Receipt photo OCR (Receipts module)
 - Natural-language queries over expenses (Insights module)
+- Spreadsheet export / import
+
+### V3+ — later
+
+- Wallet balances — de-emphasized; per-currency balances from exchanges + expenses (builds the outbox drain)
 - Anomaly / budget alerts
-- Spreadsheet export
 - FIFO cost basis for crypto wallets
 
 ## Quick start

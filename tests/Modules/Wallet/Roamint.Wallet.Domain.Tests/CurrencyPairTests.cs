@@ -34,15 +34,28 @@ public class CurrencyPairTests
     }
 
     [Fact]
-    public void Canonical_rejects_same_currency()
+    public void Canonical_ranks_amd_above_irt()
     {
-        Should.Throw<DomainException>(() => CurrencyPair.Canonical(Currency.Usd, Currency.Usd));
+        var pair = CurrencyPair.Canonical(Currency.Irt, Currency.Amd);
+
+        pair.Base.ShouldBe(Currency.Amd);
+        pair.Quote.ShouldBe(Currency.Irt);
     }
 
     [Fact]
-    public void Canonical_rejects_unsupported_currency()
+    public void Canonical_admits_usd_irt_with_irt_as_quote()
     {
-        // IRR is a display-only currency, out of scope for wallet rates.
-        Should.Throw<DomainException>(() => CurrencyPair.Canonical(Currency.Usd, Currency.Irr));
+        // IRT (toman) is display-only — admitted to rates as the lowest-priority Quote (0012 step 2).
+        var pair = CurrencyPair.Canonical(Currency.Usd, Currency.Irt);
+
+        pair.Base.ShouldBe(Currency.Usd);
+        pair.Quote.ShouldBe(Currency.Irt);
+        pair.ToString().ShouldBe("USD/IRT");
+    }
+
+    [Fact]
+    public void Canonical_rejects_same_currency()
+    {
+        Should.Throw<DomainException>(() => CurrencyPair.Canonical(Currency.Usd, Currency.Usd));
     }
 }

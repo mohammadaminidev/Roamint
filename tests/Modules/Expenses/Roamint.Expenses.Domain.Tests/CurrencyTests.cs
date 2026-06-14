@@ -9,7 +9,7 @@ public class CurrencyTests
     [InlineData("usd")]
     [InlineData(" Amd ")]
     [InlineData("USDT")]
-    [InlineData("IRR")]
+    [InlineData("IRT")]
     public void FromCode_resolves_supported_codes(string code)
     {
         Currency.FromCode(code).Code.ShouldBe(code.Trim().ToUpperInvariant());

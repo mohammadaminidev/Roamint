@@ -79,7 +79,7 @@
                         var summary = CategorySummary(expense);
                         <div class="item @(expanded == expense.Id ? "open" : null)">
                             <div class="item-head" @onclick="() => ToggleExpand(expense.Id)">
-                                <div class="icon">@Icon(summary)</div>
+                                <div class="icon"><i class="ti @Icon(summary)" aria-hidden="true"></i></div>
                                 <div class="meta">
                                     <div class="t">@(string.IsNullOrWhiteSpace(expense.Note) ? summary : expense.Note)</div>
                                     <div class="s">@summary · @expense.Lines.Count item@(expense.Lines.Count == 1 ? "" : "s")</div>
@@ -115,22 +115,24 @@
 </div>
 
 @code {
-    private static readonly string[] Denominations = ["All", "USD", "AMD", "USDT"];
+    private static readonly string[] Denominations = ["All", "USD", "AMD", "IRT"];
 
     private static readonly Dictionary<string, string> Symbols = new(StringComparer.OrdinalIgnoreCase)
     {
         ["USD"] = "$",
         ["AMD"] = "֏",
         ["USDT"] = "₮",
+        ["IRT"] = "T",
     };
 
+    // Category name → Tabler outline icon class; falls back to ti-tag for unmapped categories.
     private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Food"] = "🍽️",
-        ["Transport"] = "🚕",
-        ["Rent"] = "🏠",
-        ["Groceries"] = "🛒",
-        ["Utilities"] = "⚡",
+        ["Food"] = "ti-tools-kitchen-2",
+        ["Transport"] = "ti-car",
+        ["Rent"] = "ti-home",
+        ["Groceries"] = "ti-shopping-cart",
+        ["Utilities"] = "ti-bolt",
     };
 
     private string denomination = "All";
@@ -263,7 +265,7 @@
         return day.ToString("MMM d", CultureInfo.InvariantCulture);
     }
 
-    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
+    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "ti-tag";
 
     private static string LineMeta(ExpenseLineItem line)
     {
@@ -279,7 +281,7 @@
 
     private static string Format(decimal amount, string code)
     {
-        var decimals = code.Equals("AMD", StringComparison.OrdinalIgnoreCase) ? 0 : 2;
+        var decimals = Currency.FromCode(code).MinorUnits;
         var symbol = Symbols.GetValueOrDefault(code, string.Empty);
         return symbol + amount.ToString("N" + decimals, CultureInfo.InvariantCulture);
     }

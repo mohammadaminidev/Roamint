@@ -4,8 +4,8 @@ namespace Roamint.Wallet.Domain;
 
 /// <summary>
 /// An unordered pair of distinct currencies in canonical form: <see cref="Base"/> is the higher-priority
-/// currency (USD &gt; USDT &gt; AMD), <see cref="Quote"/> the lower. Rates are always quoted Base→Quote, so
-/// each pair maps to exactly one stored <see cref="ExchangeRate"/> regardless of the swap's direction.
+/// currency (USD &gt; USDT &gt; AMD &gt; IRT), <see cref="Quote"/> the lower. Rates are always quoted
+/// Base→Quote, so each pair maps to exactly one stored <see cref="ExchangeRate"/> regardless of direction.
 /// </summary>
 public readonly record struct CurrencyPair
 {
@@ -33,12 +33,14 @@ public readonly record struct CurrencyPair
         return Priority(a) < Priority(b) ? new CurrencyPair(a, b) : new CurrencyPair(b, a);
     }
 
-    // Lower number = higher priority = the pair's Base. IRR is a display-only currency, out of wallet rates.
+    // Lower number = higher priority = the pair's Base. IRT (toman) is display-only: it ranks last, so it is
+    // only ever a Quote (e.g. USD/IRT) — never the Base of a pair, never an expense's original currency.
     private static int Priority(Currency currency) => currency.Code switch
     {
         "USD" => 0,
         "USDT" => 1,
         "AMD" => 2,
+        "IRT" => 3,
         _ => throw new DomainException($"Currency '{currency.Code}' is not supported for exchange rates."),
     };
 

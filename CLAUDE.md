@@ -44,9 +44,9 @@ Per-slice status lives in the README V1 checklist and `docs/features/` — trust
 | Module    | Status         | Scope                                          |
 |-----------|----------------|------------------------------------------------|
 | Expenses  | V1 in progress | Headline. Expense capture, categories, tags, list. |
-| Wallet    | V1 in progress | Exchange rates + balances. Display conversion for expenses. |
-| Receipts  | V2+            | OCR pipeline — out of V1.                       |
-| Insights  | V2+            | Embeddings, NL queries — out of V1.            |
+| Wallet    | V1 in progress | Exchange rates + display conversion for expenses. Balances → V3+. |
+| Receipts  | V2             | OCR pipeline — out of V1.                       |
+| Insights  | V2             | Embeddings, NL queries — out of V1.            |
 
 ## Tech stack pins
 
