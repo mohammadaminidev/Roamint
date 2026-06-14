@@ -1,0 +1,240 @@
+.phone {
+    width: 100%;
+    max-width: 430px;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+header {
+    padding: 18px 20px 12px;
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, var(--bg) 70%, transparent);
+    z-index: 5;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    font-size: 1.15rem;
+}
+
+.brand .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+}
+
+.brand small {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.72rem;
+    margin-left: auto;
+}
+
+/* Filters */
+.filters {
+    padding: 4px 20px 12px;
+}
+
+.seg-label {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+.seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    gap: 2px;
+    margin-bottom: 12px;
+}
+
+.seg button {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 7px 12px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.seg button.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(91, 140, 255, 0.35);
+}
+
+/* Month switcher */
+.month {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.month .step {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 1.1rem;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.month .step:active {
+    transform: scale(0.94);
+}
+
+.month .step:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.month-label {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.98rem;
+    letter-spacing: -0.2px;
+}
+
+/* Missing-rate alert */
+.alert {
+    margin: 0 20px 4px;
+    padding: 11px 14px;
+    border-radius: 12px;
+    background: rgba(255, 159, 10, 0.12);
+    border: 1px solid var(--amd);
+    color: var(--amd);
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.alert-go {
+    margin-left: auto;
+}
+
+/* Summary */
+.summary {
+    margin: 10px 20px 18px;
+    flex: 1;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 16px 2px;
+}
+
+.total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 6px 4px 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.total-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+}
+
+.total-val {
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -0.6px;
+}
+
+.cat {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cat:last-child {
+    border-bottom: none;
+}
+
+.cat .icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: var(--surface-2);
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.cat .meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.cat .meta .t {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.cat .meta .s {
+    font-size: 0.76rem;
+    margin-top: 2px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.cat .meta .s.up {
+    color: var(--amd);
+}
+
+.cat .meta .s.down {
+    color: var(--ok);
+}
+
+.cat .meta .s.new {
+    color: var(--accent);
+}
+
+.cat .val {
+    font-weight: 700;
+    font-size: 0.98rem;
+    letter-spacing: -0.3px;
+    flex-shrink: 0;
+}
+
+.cat .val.gone {
+    color: var(--muted);
+}

@@ -8,9 +8,9 @@ Also a portfolio piece — modular monolith on .NET 10 with .NET Aspire, Blazor 
 
 ## Status
 
-**V1 in progress.** Expenses (capture, per-line categories, tags, converting list) and Wallet (exchange rates + display conversion) are shipped; monthly summary, category management, and Wallet balances remain. Aspire AppHost orchestrates Postgres (`pgvector/pgvector:pg17`), PgAdmin, and the Blazor Server host. Build is clean, dashboard goes green.
+**V1 in progress.** Expenses (capture, per-line categories, tags, converting list, monthly-summary reports home) and Wallet (exchange rates + display conversion) are shipped; category management and Wallet balances remain. Aspire AppHost orchestrates Postgres (`pgvector/pgvector:pg17`), PgAdmin, and the Blazor Server host. Build is clean, dashboard goes green.
 
-See [`docs/features/`](docs/features) for per-slice design records (`0001`–`0011`).
+See [`docs/features/`](docs/features) for per-slice design records (`0001`–`0012`).
 
 ### V1 roadmap — replace the Excel workflow
 
@@ -20,7 +20,7 @@ See [`docs/features/`](docs/features) for per-slice design records (`0001`–`00
 - [x] Tags — scoped (per-category) + global classification axis; managed vocabulary with per-line picker and inline create
 - [x] Exchange rates — `Exchange` + `ExchangeRate` aggregates; USD-triangulated display conversion; manual override
 - [x] Expense list — date-range / category filters; display-denomination conversion ("All" = originals) with missing-rate routing to the rate page
-- [ ] Monthly summary — per-category totals in AMD / USD / IRT (toman) with prior-month delta
+- [x] Monthly summary — reports home (`/`) with per-category totals in AMD / USD / IRT (toman), prior-month delta, and missing-rate routing to the rate page
 - [ ] Category management — create, rename, archive, merge (no destructive delete)
 
 ### V2 — not yet scoped

@@ -1,9 +1,12 @@
 # 0012 — Monthly summary (reports home)
 
-**Status:** In progress — landed: kernel `Irr→Irt` (step 1), Tabler icon font + emoji retrofit (step 4),
-Wallet admits `IRT` to canonical pairs + `/rates` IRT entry (step 2), list "View in" → USD/AMD/IRT,
-`GetMonthlySummary` read model (step 3 — EF SQL `GROUP BY` (category × currency), Testcontainers tests,
-`IExpensesQueries.GetMonthlySummaryAsync` + `CategorySpendItem` DTO). Next: reports home (step 5).
+**Status:** Done — all five steps landed. Kernel `Irr→Irt` (step 1), Wallet admits `IRT` to canonical
+pairs + `/rates` IRT entry (step 2), `GetMonthlySummary` read model (step 3 — EF SQL `GROUP BY`
+(category × currency), Testcontainers tests, `IExpensesQueries.GetMonthlySummaryAsync` +
+`CategorySpendItem` DTO), Tabler icon font + emoji retrofit (step 4), reports home `Home.razor` at `/`
+(step 5 — month switcher, USD/AMD/IRT denomination re-fold, per-category convert-then-sum, grand total,
+prior-month delta, missing-rate banner → `/rates`, symmetric 5-slot nav + `/categories` placeholder).
+Next feature: category management.
 **Lands in (proposed):** `src/Modules/Expenses/Roamint.Expenses.Application/`,
 `src/Modules/Expenses/Roamint.Expenses.Infrastructure/`,
 `src/Modules/Expenses/Roamint.Expenses.Contracts/`, `src/Bootstrap/Roamint.Web/`,
@@ -146,9 +149,11 @@ the already-generic `SetRate("IRT", …)` path — no new Contracts type.
 
 ## Open questions
 
-- **Prior-month delta presentation** — absolute (`+₣12,300`) and/or percentage, and how to render a
-  category that's new this month (no prior baseline). A UI detail; settle when wiring the screen against the
-  mockup, not a blocker for the read model.
+- ~~**Prior-month delta presentation**~~ **Resolved (step 5):** the delta is the **absolute converted
+  change** in the display currency (no percentage) — `▲ <amount>` in warning amber when spend rose, `▼
+  <amount>` in green when it fell, `no change` when flat. A category with **no prior baseline** shows a
+  blue `new` pill instead of a delta; one **gone this month** sorts to the bottom with a muted `0` total and
+  the full `▼` drop. Rows order by current-month converted total descending.
 
 ## Verification
 

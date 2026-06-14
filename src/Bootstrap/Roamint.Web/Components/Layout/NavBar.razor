@@ -2,6 +2,11 @@
 
 <div class="nav-dock">
     <nav class="nav">
+        @* Root match must be exact, else this tab stays active on every route. *@
+        <NavLink class="nav-item" href="" Match="NavLinkMatch.All">
+            <i class="ti ti-chart-pie ic" aria-hidden="true"></i>
+            <span class="label">Reports</span>
+        </NavLink>
         <NavLink class="nav-item" href="expenses">
             <i class="ti ti-notes ic" aria-hidden="true"></i>
             <span class="label">Expenses</span>
@@ -12,6 +17,10 @@
         <NavLink class="nav-item" href="rates">
             <i class="ti ti-arrows-exchange ic" aria-hidden="true"></i>
             <span class="label">Rates</span>
+        </NavLink>
+        <NavLink class="nav-item" href="categories">
+            <i class="ti ti-tag ic" aria-hidden="true"></i>
+            <span class="label">Categories</span>
         </NavLink>
     </nav>
 </div>

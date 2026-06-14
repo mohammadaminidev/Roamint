@@ -1,0 +1,259 @@
+@page "/"
+@using System.Globalization
+@using Roamint.Expenses.Contracts
+@using Roamint.SharedKernel
+@using Roamint.Wallet.Contracts
+@using Roamint.Web.Services
+@inject IExpensesQueries Expenses
+@inject IWalletQueries Wallet
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+
+<PageTitle>Reports · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Reports
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="filters">
+        <div class="seg-label">Spend by category</div>
+        <div class="seg">
+            @foreach (var option in Denominations)
+            {
+                <button type="button" class="@(option == denomination ? "active" : null)"
+                        @onclick="() => SelectDenomination(option)">@option</button>
+            }
+        </div>
+
+        <div class="month">
+            <button type="button" class="step" @onclick="PrevMonth" aria-label="Previous month">
+                <i class="ti ti-chevron-left" aria-hidden="true"></i>
+            </button>
+            <span class="month-label">@monthAnchor.ToString("MMMM yyyy", CultureInfo.InvariantCulture)</span>
+            <button type="button" class="step" disabled="@AtCurrentMonth" @onclick="NextMonth" aria-label="Next month">
+                <i class="ti ti-chevron-right" aria-hidden="true"></i>
+            </button>
+        </div>
+    </div>
+
+    @if (MissingCurrencies.Count > 0)
+    {
+        <div class="alert" @onclick="GoToRates">
+            <span>No @denomination rate for @string.Join(", ", MissingCurrencies). Tap to set it.</span>
+            <span class="alert-go">→</span>
+        </div>
+    }
+
+    <div class="summary">
+        @if (rows is null)
+        {
+            <p class="hint">Loading…</p>
+        }
+        else if (MissingCurrencies.Count > 0)
+        {
+            <p class="hint">Set the rate above to see this month in @denomination.</p>
+        }
+        else if (rows.Count == 0)
+        {
+            <p class="hint">No spending in @monthAnchor.ToString("MMMM", CultureInfo.InvariantCulture).</p>
+        }
+        else
+        {
+            <div class="total">
+                <span class="total-label">Total</span>
+                <span class="total-val">@Format(grandTotal)</span>
+            </div>
+
+            @foreach (var row in rows)
+            {
+                var delta = Delta(row);
+                <div class="cat">
+                    <div class="icon"><i class="ti @Icon(row.Name)" aria-hidden="true"></i></div>
+                    <div class="meta">
+                        <div class="t">@row.Name</div>
+                        <div class="s @delta.Cls">@delta.Text</div>
+                    </div>
+                    <div class="val @(row.Current == 0m ? "gone" : null)">@Format(row.Current)</div>
+                </div>
+            }
+        }
+    </div>
+
+    <NavBar />
+</div>
+
+@code {
+    private static readonly string[] Denominations = ["USD", "AMD", "IRT"];
+
+    private static readonly Dictionary<string, string> Symbols = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["USD"] = "$",
+        ["AMD"] = "֏",
+        ["USDT"] = "₮",
+        ["IRT"] = "T",
+    };
+
+    // Category name → Tabler outline icon class; falls back to ti-tag for unmapped categories.
+    private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Food"] = "ti-tools-kitchen-2",
+        ["Transport"] = "ti-car",
+        ["Rent"] = "ti-home",
+        ["Groceries"] = "ti-shopping-cart",
+        ["Utilities"] = "ti-bolt",
+    };
+
+    private string denomination = "AMD"; // the local cash currency the user reconciles against (0012 D3)
+    private DateOnly monthAnchor; // first day of the displayed month
+    private DateOnly currentMonthAnchor;
+
+    private RateConverter converter = new(Array.Empty<CurrentRateDto>());
+    private IReadOnlyList<CategorySpendItem> current = [];
+    private IReadOnlyList<CategorySpendItem> prior = [];
+
+    private IReadOnlyList<Row>? rows;
+    private decimal grandTotal;
+    private IReadOnlyList<string> MissingCurrencies { get; set; } = [];
+
+    private bool AtCurrentMonth => monthAnchor == currentMonthAnchor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
+        currentMonthAnchor = new DateOnly(today.Year, today.Month, 1);
+        monthAnchor = currentMonthAnchor;
+        converter = new RateConverter(await Wallet.GetCurrentRatesAsync());
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var curFrom = monthAnchor;
+        var curTo = monthAnchor.AddMonths(1).AddDays(-1);
+        var priorFrom = monthAnchor.AddMonths(-1);
+        var priorTo = monthAnchor.AddDays(-1);
+
+        current = await Expenses.GetMonthlySummaryAsync(curFrom, curTo);
+        prior = await Expenses.GetMonthlySummaryAsync(priorFrom, priorTo);
+        Recompute();
+    }
+
+    private async Task PrevMonth()
+    {
+        monthAnchor = monthAnchor.AddMonths(-1);
+        await ReloadAsync();
+    }
+
+    private async Task NextMonth()
+    {
+        if (AtCurrentMonth)
+        {
+            return;
+        }
+
+        monthAnchor = monthAnchor.AddMonths(1);
+        await ReloadAsync();
+    }
+
+    private void SelectDenomination(string option)
+    {
+        denomination = option;
+        Recompute(); // re-fold the already-loaded buckets; no re-query needed
+    }
+
+    // Folds the per-(category × currency) buckets of both months into one display-currency total per
+    // category and the prior-month baseline. If any currency present in either month can't reach the chosen
+    // denomination, surfaces it as a missing pair and emits no totals rather than a partial sum (0012 D3).
+    private void Recompute()
+    {
+        var target = Currency.FromCode(denomination);
+
+        MissingCurrencies = current.Concat(prior)
+            .Select(bucket => bucket.CurrencyCode)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(code => !converter.CanConvert(Currency.FromCode(code), target))
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+
+        if (MissingCurrencies.Count > 0)
+        {
+            rows = [];
+            grandTotal = 0m;
+            return;
+        }
+
+        var curByCat = Fold(current, target);
+        var priorByCat = Fold(prior, target);
+
+        rows = curByCat.Keys.Union(priorByCat.Keys)
+            .Select(id =>
+            {
+                var cur = curByCat.GetValueOrDefault(id);
+                var pri = priorByCat.GetValueOrDefault(id);
+                return new Row(
+                    cur?.Name ?? pri!.Name,
+                    cur?.Total ?? 0m,
+                    pri?.Total ?? 0m,
+                    HasPrior: pri is not null);
+            })
+            .OrderByDescending(row => row.Current)
+            .ThenBy(row => row.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        grandTotal = rows.Sum(row => row.Current);
+    }
+
+    // Every currency converts here (missing ones short-circuit Recompute first), so the out-total is exact.
+    private Dictionary<Guid, CatAgg> Fold(IReadOnlyList<CategorySpendItem> buckets, Currency target)
+    {
+        var map = new Dictionary<Guid, CatAgg>();
+        foreach (var bucket in buckets)
+        {
+            converter.TryConvert(bucket.Total, Currency.FromCode(bucket.CurrencyCode), target, out var converted);
+            map[bucket.CategoryId] = map.TryGetValue(bucket.CategoryId, out var agg)
+                ? agg with { Total = agg.Total + converted }
+                : new CatAgg(bucket.CategoryName, converted);
+        }
+
+        return map;
+    }
+
+    private void GoToRates() => Nav.NavigateTo("rates");
+
+    // Prior-month delta: a "new" pill when there's no baseline; otherwise the signed converted change —
+    // up (more spent) in warning amber, down (less spent) in green, flat when unchanged.
+    private (string Text, string Cls) Delta(Row row)
+    {
+        if (!row.HasPrior)
+        {
+            return ("new", "new");
+        }
+
+        var change = row.Current - row.Prior;
+        if (change == 0m)
+        {
+            return ("no change", "flat");
+        }
+
+        var arrow = change > 0m ? "▲" : "▼";
+        var cls = change > 0m ? "up" : "down";
+        return ($"{arrow} {Format(Math.Abs(change))}", cls);
+    }
+
+    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "ti-tag";
+
+    private string Format(decimal amount)
+    {
+        var decimals = Currency.FromCode(denomination).MinorUnits;
+        var symbol = Symbols.GetValueOrDefault(denomination, string.Empty);
+        return symbol + amount.ToString("N" + decimals, CultureInfo.InvariantCulture);
+    }
+
+    private sealed record Row(string Name, decimal Current, decimal Prior, bool HasPrior);
+
+    private sealed record CatAgg(string Name, decimal Total);
+}

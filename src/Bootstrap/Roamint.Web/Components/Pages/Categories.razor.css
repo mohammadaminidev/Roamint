@@ -1,0 +1,66 @@
+.phone {
+    width: 100%;
+    max-width: 430px;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+header {
+    padding: 18px 20px 12px;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    font-size: 1.15rem;
+}
+
+.brand .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+}
+
+.brand small {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.72rem;
+    margin-left: auto;
+}
+
+.placeholder {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 32px;
+    gap: 6px;
+}
+
+.placeholder i {
+    font-size: 2.6rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+}
+
+.placeholder .title {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.placeholder .sub {
+    color: var(--muted);
+    font-size: 0.85rem;
+    max-width: 260px;
+}

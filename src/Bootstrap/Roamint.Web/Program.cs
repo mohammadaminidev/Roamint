@@ -24,10 +24,6 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.MapStaticAssets();
 
-// Home redirects to the expense list for now (a reports dashboard will live here later). Done at the HTTP
-// level rather than a component, so it never trips NavigationException under interactive (pre)rendering.
-app.MapGet("/", () => Results.Redirect("/expenses"));
-
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
