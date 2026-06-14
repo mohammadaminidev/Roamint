@@ -27,6 +27,14 @@ public interface IExpensesQueries
     /// when the user picks from the dropdown.
     /// </summary>
     Task<Guid?> SuggestCategoryAsync(string itemText, CancellationToken ct = default);
+
+    /// <summary>
+    /// Expenses newest-first for the list screen, in their original currency (conversion is composed by the
+    /// host). Optionally bounded by a date range; <paramref name="categoryFilter"/> matches an expense when
+    /// any line is in that category. Currency is a display denomination, not a filter.
+    /// </summary>
+    Task<IReadOnlyList<ExpenseListItem>> ListExpensesAsync(
+        DateOnly? fromDate = null, DateOnly? toDate = null, Guid? categoryFilter = null, CancellationToken ct = default);
 }
 
 public sealed record CategoryListItem(Guid Id, string Name);
@@ -37,3 +45,13 @@ public sealed record TagListItem(Guid Id, string Name, Guid? Scope);
 /// <summary>An autocomplete suggestion: the historical item text plus the category, quantity unit (canonical
 /// code, or null), and the tags last used with it.</summary>
 public sealed record ItemSuggestion(string Text, Guid? CategoryId, string? Unit, IReadOnlyList<Guid> TagIds);
+
+/// <summary>A line on an expense list row: description, category (id + name), amount paid, and optional
+/// quantity (value + canonical unit code, or null).</summary>
+public sealed record ExpenseLineItem(
+    string Description, Guid CategoryId, string CategoryName, decimal Amount, decimal? QuantityValue, string? QuantityUnit);
+
+/// <summary>An expense list row in its original currency. <see cref="Total"/>/<see cref="CurrencyCode"/> are
+/// derived from the lines; the host converts for display.</summary>
+public sealed record ExpenseListItem(
+    Guid Id, DateOnly OccurredOn, string CurrencyCode, decimal Total, string? Note, IReadOnlyList<ExpenseLineItem> Lines);

@@ -1,7 +1,8 @@
 @page "/"
+@inject NavigationManager Nav
 
-<PageTitle>Roamint</PageTitle>
+@* Home redirects to the expense list for now; a reports dashboard will live here later (0011). *@
 
-<h1>Roamint</h1>
-<p>Scaffold is live. Service health and resources are visible in the Aspire dashboard.</p>
-<p><a href="/add">Add an expense →</a></p>
+@code {
+    protected override void OnInitialized() => Nav.NavigateTo("expenses", replace: true);
+}

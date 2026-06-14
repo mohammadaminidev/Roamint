@@ -1,0 +1,195 @@
+.phone {
+    width: 100%;
+    max-width: 430px;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+header {
+    padding: 18px 20px 12px;
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, var(--bg) 70%, transparent);
+    z-index: 5;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    font-size: 1.15rem;
+}
+
+.brand .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+}
+
+.brand small {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.72rem;
+    margin-left: auto;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    margin: 14px 20px 0;
+    padding: 18px 18px 20px;
+}
+
+.card h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.rate-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.rate-row:last-child {
+    border-bottom: none;
+}
+
+.rate-pair {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.rate-src {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--muted);
+}
+
+.set-row,
+.swap-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.per {
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+input[type="text"],
+input[type="date"],
+select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 11px 12px;
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    font-family: inherit;
+}
+
+input[type="text"] {
+    flex: 1;
+    min-width: 0;
+}
+
+select {
+    font-weight: 700;
+}
+
+input:focus,
+select:focus {
+    border-color: var(--accent);
+}
+
+::deep ::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+}
+
+.swap-arrow {
+    text-align: center;
+    color: var(--muted);
+    font-size: 1.1rem;
+    margin: 2px 0 8px;
+}
+
+.field {
+    margin-top: 4px;
+    margin-bottom: 12px;
+}
+
+.field label {
+    display: block;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+.field input[type="date"] {
+    width: 100%;
+}
+
+.action {
+    width: 100%;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 13px;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(91, 140, 255, 0.3);
+}
+
+.action:active {
+    transform: translateY(1px);
+}
+
+.action:disabled {
+    opacity: 0.6;
+}
+
+.msg {
+    margin: 12px 20px 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.msg.error {
+    color: var(--danger);
+}
+
+.msg.success {
+    color: var(--ok);
+}

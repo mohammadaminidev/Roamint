@@ -1,0 +1,286 @@
+@page "/expenses"
+@using System.Globalization
+@using Roamint.Expenses.Contracts
+@using Roamint.SharedKernel
+@using Roamint.Wallet.Contracts
+@using Roamint.Web.Services
+@inject IExpensesQueries Expenses
+@inject IWalletQueries Wallet
+@inject TimeProvider Clock
+@inject NavigationManager Nav
+
+<PageTitle>Expenses · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Expenses
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="filters">
+        <div class="seg-label">View in</div>
+        <div class="seg">
+            @foreach (var option in Denominations)
+            {
+                <button type="button" class="@(option == denomination ? "active" : null)"
+                        @onclick="() => SelectDenomination(option)">@option</button>
+            }
+        </div>
+
+        <div class="chips">
+            <button type="button" class="chip @(categoryFilter is null ? "active" : null)"
+                    @onclick="() => SelectCategory(null)">All</button>
+            @foreach (var category in categories)
+            {
+                <button type="button" class="chip @(categoryFilter == category.Id ? "active" : null)"
+                        @onclick="() => SelectCategory(category.Id)">@category.Name</button>
+            }
+        </div>
+
+        <div class="range">
+            <input type="date" @bind="fromDate" @bind:after="ReloadAsync" max="@today.ToString("yyyy-MM-dd")" />
+            <span class="range-sep">→</span>
+            <input type="date" @bind="toDate" @bind:after="ReloadAsync" max="@today.ToString("yyyy-MM-dd")" />
+        </div>
+    </div>
+
+    @if (MissingCurrencies.Count > 0)
+    {
+        <div class="alert" @onclick="GoToRates">
+            <span>No @denomination rate for @string.Join(", ", MissingCurrencies). Tap to set it.</span>
+            <span class="alert-go">→</span>
+        </div>
+    }
+
+    <div class="feed">
+        @if (expenses is null)
+        {
+            <p class="hint">Loading…</p>
+        }
+        else if (expenses.Count == 0)
+        {
+            <p class="hint">No expenses in this range.</p>
+        }
+        else
+        {
+            @foreach (var day in expenses.GroupBy(e => e.OccurredOn).OrderByDescending(g => g.Key))
+            {
+                <div class="day">
+                    <h3>
+                        <span class="d">@DayLabel(day.Key)</span>
+                        <span class="dt">· @day.Key.ToString("MMM d")</span>
+                        <span class="tot">@DaySubtotal(day)</span>
+                    </h3>
+
+                    @foreach (var expense in day)
+                    {
+                        var summary = CategorySummary(expense);
+                        <div class="item @(expanded == expense.Id ? "open" : null)">
+                            <div class="item-head" @onclick="() => ToggleExpand(expense.Id)">
+                                <div class="icon">@Icon(summary)</div>
+                                <div class="meta">
+                                    <div class="t">@(string.IsNullOrWhiteSpace(expense.Note) ? summary : expense.Note)</div>
+                                    <div class="s">@summary · @expense.Lines.Count item@(expense.Lines.Count == 1 ? "" : "s")</div>
+                                </div>
+                                <div class="val">
+                                    <div class="v @(RowConvertible(expense) ? null : "no-rate")">@RowDisplay(expense)</div>
+                                    <div class="c">@RowUnit(expense)</div>
+                                </div>
+                            </div>
+                            @if (expanded == expense.Id)
+                            {
+                                <div class="lines">
+                                    @foreach (var line in expense.Lines)
+                                    {
+                                        <div class="line">
+                                            <span class="ld">
+                                                @line.Description
+                                                <span class="lq">· @LineMeta(line)</span>
+                                            </span>
+                                            <span class="la">@Format(line.Amount, expense.CurrencyCode)</span>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+
+    <NavBar />
+</div>
+
+@code {
+    private static readonly string[] Denominations = ["All", "USD", "AMD", "USDT"];
+
+    private static readonly Dictionary<string, string> Symbols = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["USD"] = "$",
+        ["AMD"] = "֏",
+        ["USDT"] = "₮",
+    };
+
+    private static readonly Dictionary<string, string> Icons = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Food"] = "🍽️",
+        ["Transport"] = "🚕",
+        ["Rent"] = "🏠",
+        ["Groceries"] = "🛒",
+        ["Utilities"] = "⚡",
+    };
+
+    private string denomination = "All";
+    private Guid? categoryFilter;
+    private DateOnly fromDate;
+    private DateOnly toDate;
+    private DateOnly today;
+    private Guid? expanded;
+
+    private IReadOnlyList<CategoryListItem> categories = [];
+    private IReadOnlyList<ExpenseListItem>? expenses;
+    private RateConverter converter = new(Array.Empty<CurrentRateDto>());
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
+        fromDate = new DateOnly(today.Year, today.Month, 1); // current month by default
+        toDate = today;
+        categories = await Expenses.ListActiveCategoriesAsync();
+        converter = new RateConverter(await Wallet.GetCurrentRatesAsync());
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        expenses = await Expenses.ListExpensesAsync(fromDate, toDate, categoryFilter);
+    }
+
+    private void SelectDenomination(string option)
+    {
+        denomination = option;
+        expanded = null;
+    }
+
+    private async Task SelectCategory(Guid? id)
+    {
+        categoryFilter = id;
+        await ReloadAsync();
+    }
+
+    private void ToggleExpand(Guid id) => expanded = expanded == id ? null : id;
+
+    private void GoToRates() => Nav.NavigateTo("rates");
+
+    // ---- Conversion / display ----
+
+    private bool ShowOriginals => denomination == "All";
+
+    private bool RowConvertible(ExpenseListItem expense) =>
+        ShowOriginals || converter.CanConvert(Currency.FromCode(expense.CurrencyCode), Currency.FromCode(denomination));
+
+    // Distinct source currencies in the current list that can't reach the chosen denomination.
+    private IReadOnlyList<string> MissingCurrencies
+    {
+        get
+        {
+            if (ShowOriginals || expenses is null)
+            {
+                return [];
+            }
+
+            var target = Currency.FromCode(denomination);
+            return expenses
+                .Select(expense => expense.CurrencyCode)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(code => !converter.CanConvert(Currency.FromCode(code), target))
+                .ToList();
+        }
+    }
+
+    private string RowDisplay(ExpenseListItem expense)
+    {
+        if (ShowOriginals || !RowConvertible(expense))
+        {
+            return Format(expense.Total, expense.CurrencyCode);
+        }
+
+        converter.TryConvert(expense.Total, Currency.FromCode(expense.CurrencyCode), Currency.FromCode(denomination), out var converted);
+        return Format(converted, denomination);
+    }
+
+    private string RowUnit(ExpenseListItem expense) =>
+        (ShowOriginals || !RowConvertible(expense)) ? expense.CurrencyCode : denomination;
+
+    // Day subtotal: under "All" show per-currency originals; otherwise convert each currency's day-subtotal
+    // (not a sum of already-rounded rows) and total them — skipping any currency without a rate.
+    private string DaySubtotal(IGrouping<DateOnly, ExpenseListItem> day)
+    {
+        var byCurrency = day
+            .GroupBy(expense => expense.CurrencyCode, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (Code: group.Key, Sum: group.Sum(expense => expense.Total)))
+            .ToList();
+
+        if (ShowOriginals)
+        {
+            return string.Join(" · ", byCurrency.Select(entry => Format(entry.Sum, entry.Code)));
+        }
+
+        var target = Currency.FromCode(denomination);
+        var total = 0m;
+        foreach (var entry in byCurrency)
+        {
+            if (converter.TryConvert(entry.Sum, Currency.FromCode(entry.Code), target, out var converted))
+            {
+                total += converted;
+            }
+        }
+
+        return Format(total, denomination);
+    }
+
+    private string CategorySummary(ExpenseListItem expense)
+    {
+        var names = expense.Lines.Select(line => line.CategoryName).Distinct(StringComparer.Ordinal).ToList();
+        return names.Count == 1 ? names[0] : "Mixed";
+    }
+
+    private string DayLabel(DateOnly day)
+    {
+        if (day == today)
+        {
+            return "Today";
+        }
+
+        if (day == today.AddDays(-1))
+        {
+            return "Yesterday";
+        }
+
+        return day.ToString("MMM d", CultureInfo.InvariantCulture);
+    }
+
+    private static string Icon(string name) => Icons.TryGetValue(name, out var icon) ? icon : "🏷️";
+
+    private static string LineMeta(ExpenseLineItem line)
+    {
+        var parts = new List<string>();
+        if (line.QuantityValue is decimal qty && line.QuantityUnit is not null)
+        {
+            parts.Add($"{qty.ToString("0.####", CultureInfo.InvariantCulture)} {line.QuantityUnit}");
+        }
+
+        parts.Add(line.CategoryName);
+        return string.Join(" · ", parts);
+    }
+
+    private static string Format(decimal amount, string code)
+    {
+        var decimals = code.Equals("AMD", StringComparison.OrdinalIgnoreCase) ? 0 : 2;
+        var symbol = Symbols.GetValueOrDefault(code, string.Empty);
+        return symbol + amount.ToString("N" + decimals, CultureInfo.InvariantCulture);
+    }
+}

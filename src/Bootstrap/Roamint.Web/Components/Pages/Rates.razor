@@ -1,0 +1,182 @@
+@page "/rates"
+@using System.Globalization
+@using Roamint.SharedKernel
+@using Roamint.Wallet.Contracts
+@inject IWalletApi Api
+@inject IWalletQueries Queries
+@inject TimeProvider Clock
+
+<PageTitle>Exchange rates · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Exchange rates
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="card">
+        <h2>Current rates</h2>
+        @if (rates is null)
+        {
+            <p class="hint">Loading…</p>
+        }
+        else if (rates.Count == 0)
+        {
+            <p class="hint">No rates yet — record an exchange or set one below.</p>
+        }
+        else
+        {
+            @foreach (var rate in rates)
+            {
+                <div class="rate-row">
+                    <span class="rate-pair">1 @rate.BaseCurrencyCode = @Trim(rate.Rate) @rate.QuoteCurrencyCode</span>
+                    <span class="rate-src">@rate.Source</span>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="card">
+        <h2>Set a rate</h2>
+        <div class="set-row">
+            <span class="per">1 USD =</span>
+            <input type="text" inputmode="decimal" placeholder="Rate" @bind="manualRate" />
+            <select @bind="manualQuote">
+                @foreach (var cur in QuoteCurrencies)
+                {
+                    <option value="@cur">@cur</option>
+                }
+            </select>
+        </div>
+        <button type="button" class="action" disabled="@busy" @onclick="SetRate">Set rate</button>
+    </div>
+
+    <div class="card">
+        <h2>Record an exchange</h2>
+        <div class="swap-row">
+            <input type="text" inputmode="decimal" placeholder="Gave" @bind="fromAmount" />
+            <select @bind="fromCode">
+                @foreach (var cur in AllCurrencies)
+                {
+                    <option value="@cur">@cur</option>
+                }
+            </select>
+        </div>
+        <div class="swap-arrow">↓</div>
+        <div class="swap-row">
+            <input type="text" inputmode="decimal" placeholder="Got" @bind="toAmount" />
+            <select @bind="toCode">
+                @foreach (var cur in AllCurrencies)
+                {
+                    <option value="@cur">@cur</option>
+                }
+            </select>
+        </div>
+        <div class="field">
+            <label>Date</label>
+            <input type="date" @bind="date" max="@today.ToString("yyyy-MM-dd")" />
+        </div>
+        <button type="button" class="action" disabled="@busy" @onclick="RecordExchange">Record exchange</button>
+    </div>
+
+    @if (error is not null)
+    {
+        <p class="msg error">@error</p>
+    }
+    @if (success is not null)
+    {
+        <p class="msg success">@success</p>
+    }
+
+    <NavBar />
+</div>
+
+@code {
+    private static readonly string[] AllCurrencies = ["USD", "AMD", "USDT"];
+    private static readonly string[] QuoteCurrencies = ["AMD", "USDT"]; // USD is the anchor
+
+    private IReadOnlyList<CurrentRateDto>? rates;
+    private DateOnly today;
+    private DateOnly date;
+    private bool busy;
+    private string? error;
+    private string? success;
+
+    private string manualQuote = "AMD";
+    private string manualRate = string.Empty;
+
+    private string fromAmount = string.Empty;
+    private string fromCode = "USD";
+    private string toAmount = string.Empty;
+    private string toCode = "AMD";
+
+    protected override async Task OnInitializedAsync()
+    {
+        today = DateOnly.FromDateTime(Clock.GetUtcNow().UtcDateTime);
+        date = today;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync() => rates = await Queries.GetCurrentRatesAsync();
+
+    private async Task SetRate()
+    {
+        error = success = null;
+        if (!TryParse(manualRate, out var rate))
+        {
+            error = "Enter a valid rate.";
+            return;
+        }
+
+        await Run(async () =>
+        {
+            await Api.SetRateAsync(new SetRateRequest(manualQuote, rate));
+            success = $"1 USD = {Trim(rate)} {manualQuote}.";
+            manualRate = string.Empty;
+            await ReloadAsync();
+        });
+    }
+
+    private async Task RecordExchange()
+    {
+        error = success = null;
+        if (!TryParse(fromAmount, out var gave) || !TryParse(toAmount, out var got))
+        {
+            error = "Enter both amounts.";
+            return;
+        }
+
+        await Run(async () =>
+        {
+            await Api.RecordExchangeAsync(new RecordExchangeRequest(gave, fromCode, got, toCode, date));
+            success = $"Recorded {Trim(gave)} {fromCode} → {Trim(got)} {toCode}.";
+            fromAmount = toAmount = string.Empty;
+            await ReloadAsync();
+        });
+    }
+
+    private async Task Run(Func<Task> action)
+    {
+        busy = true;
+        try
+        {
+            await action();
+        }
+        catch (DomainException ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private static bool TryParse(string text, out decimal value) =>
+        decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value)
+        || decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out value);
+
+    private static string Trim(decimal value) => value.ToString("0.########", CultureInfo.InvariantCulture);
+}

@@ -190,6 +190,66 @@ internal sealed class SuggestCategoryHandler(ExpensesDbContext db)
     }
 }
 
+/// <summary>
+/// Read model for the expense list. Loads matching expenses (with their lines) newest-first and resolves
+/// line category names from the categories table in one extra round trip, mapping to the view in memory.
+/// Currency/Total are the aggregate's derived values, read off the materialized lines. Personal scale —
+/// no pagination yet.
+/// </summary>
+internal sealed class ListExpensesHandler(ExpensesDbContext db)
+    : IQueryHandler<ListExpenses, IReadOnlyList<ExpenseRowView>>
+{
+    public async Task<IReadOnlyList<ExpenseRowView>> HandleAsync(ListExpenses query, CancellationToken ct)
+    {
+        var expenses = db.Expenses.AsNoTracking().Include(expense => expense.Lines).AsQueryable();
+
+        if (query.From is DateOnly from)
+        {
+            expenses = expenses.Where(expense => expense.OccurredOn >= from);
+        }
+
+        if (query.To is DateOnly to)
+        {
+            expenses = expenses.Where(expense => expense.OccurredOn <= to);
+        }
+
+        if (query.CategoryFilter is Guid categoryFilter)
+        {
+            var category = new CategoryId(categoryFilter);
+            expenses = expenses.Where(expense => expense.Lines.Any(line => line.CategoryId == category));
+        }
+
+        var rows = await expenses
+            .OrderByDescending(expense => expense.OccurredOn)
+            .ThenByDescending(expense => expense.Id)
+            .ToListAsync(ct);
+
+        var nameById = (await db.Categories
+                .AsNoTracking()
+                .Select(category => new { category.Id, category.Name })
+                .ToListAsync(ct))
+            .ToDictionary(category => category.Id, category => category.Name);
+
+        return rows
+            .Select(expense => new ExpenseRowView(
+                expense.Id.Value,
+                expense.OccurredOn,
+                expense.Currency.Code,
+                expense.Total.Amount,
+                expense.Note,
+                expense.Lines
+                    .Select(line => new ExpenseLineRowView(
+                        line.Description,
+                        line.CategoryId.Value,
+                        nameById.GetValueOrDefault(line.CategoryId, string.Empty),
+                        line.Amount.Amount,
+                        line.Quantity?.Value,
+                        line.Quantity?.Unit.ToCode()))
+                    .ToList()))
+            .ToList();
+    }
+}
+
 /// <summary>SQL <c>LIKE</c>/<c>ILIKE</c> escaping for user-typed text, with an explicit escape char.</summary>
 file static class Like
 {

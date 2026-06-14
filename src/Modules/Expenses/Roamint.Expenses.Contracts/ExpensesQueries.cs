@@ -29,4 +29,27 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
 
     public Task<Guid?> SuggestCategoryAsync(string itemText, CancellationToken ct = default) =>
         queries.QueryAsync(new SuggestCategory(itemText), ct);
+
+    public async Task<IReadOnlyList<ExpenseListItem>> ListExpensesAsync(
+        DateOnly? fromDate = null, DateOnly? toDate = null, Guid? categoryFilter = null, CancellationToken ct = default)
+    {
+        var rows = await queries.QueryAsync(new ListExpenses(fromDate, toDate, categoryFilter), ct);
+        return rows
+            .Select(row => new ExpenseListItem(
+                row.Id,
+                row.OccurredOn,
+                row.CurrencyCode,
+                row.Total,
+                row.Note,
+                row.Lines
+                    .Select(line => new ExpenseLineItem(
+                        line.Description,
+                        line.CategoryId,
+                        line.CategoryName,
+                        line.Amount,
+                        line.QuantityValue,
+                        line.QuantityUnit))
+                    .ToList()))
+            .ToList();
+    }
 }
