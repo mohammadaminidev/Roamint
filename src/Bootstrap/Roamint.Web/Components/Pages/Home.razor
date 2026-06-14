@@ -1,8 +1,0 @@
-@page "/"
-@inject NavigationManager Nav
-
-@* Home redirects to the expense list for now; a reports dashboard will live here later (0011). *@
-
-@code {
-    protected override void OnInitialized() => Nav.NavigateTo("expenses", replace: true);
-}
