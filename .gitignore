@@ -363,6 +363,9 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # Roamint additions
+# Real import data is private; only the anonymized template (import.sample.csv) is tracked.
+seed/*.csv
+!seed/import.sample.csv
 .env
 .env.*
 *.local.json

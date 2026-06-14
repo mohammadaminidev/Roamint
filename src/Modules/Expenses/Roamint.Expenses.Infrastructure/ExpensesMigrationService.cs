@@ -13,13 +13,15 @@ namespace Roamint.Expenses.Infrastructure;
 internal sealed class ExpensesMigrationService(IServiceProvider services, IHostEnvironment environment)
     : IHostedService
 {
+    // The real taxonomy (0013): the English mapping of the user's spreadsheet categories. Replaces the
+    // placeholder set so the app's baseline categories match the imported history.
     private static readonly string[] StarterCategories =
-        ["Food", "Transport", "Rent", "Groceries", "Utilities"];
+        ["Household", "Groceries", "Personal Care", "Dining Out", "Transport", "Travel", "Miscellaneous", "Rent", "Utilities"];
 
-    // Anonymized starter tags (0009 seed set): scoped sub-classifications of Groceries, plus globals.
+    // Grocery tier tags (0013 D9): the food-level signal (خوراکی لول ۱/۲/۳) carried as tags scoped to Groceries.
     private const string ScopedTagCategory = "Groceries";
-    private static readonly string[] ScopedStarterTags = ["Fruit", "Vegetables", "Dairy"];
-    private static readonly string[] GlobalStarterTags = ["For Happiness", "Gift", "Essential"];
+    private static readonly string[] ScopedStarterTags = ["Essential", "Comfort", "Treat"];
+    private static readonly string[] GlobalStarterTags = [];
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {

@@ -1,6 +1,7 @@
 using Roamint.Expenses.Contracts;
 using Roamint.Wallet.Contracts;
 using Roamint.Web.Components;
+using Roamint.Web.Import;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,6 +10,9 @@ builder.AddExpensesModule();
 builder.AddWalletModule();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Dev-only spreadsheet import tooling (0013); the /import page guards on the environment.
+builder.Services.AddScoped<SpreadsheetImporter>();
 
 var app = builder.Build();
 

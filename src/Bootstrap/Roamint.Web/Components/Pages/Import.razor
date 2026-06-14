@@ -1,0 +1,142 @@
+@page "/import"
+@using System.Globalization
+@using Roamint.SharedKernel
+@using Roamint.Web.Import
+@inject SpreadsheetImporter Importer
+@inject IHostEnvironment Env
+@inject TimeProvider Clock
+
+<PageTitle>Import · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Import
+            <small>dev only</small>
+        </div>
+    </header>
+
+    @if (!Env.IsDevelopment())
+    {
+        <div class="card">
+            <p class="hint">The importer is available in the Development environment only.</p>
+        </div>
+    }
+    else
+    {
+        <div class="card">
+            <h2>Seed from spreadsheet</h2>
+            <p class="hint">
+                Export your sheet tab to CSV and pick it below. Rows become one expense per (month × category),
+                all in AMD, dated to the 1st. Runs once — a no-op if expenses already exist.
+            </p>
+
+            <div class="field">
+                <label>CSV file</label>
+                <InputFile OnChange="OnFile" accept=".csv" />
+            </div>
+
+            <div class="field">
+                <label>Year (the sheet has no year)</label>
+                <input type="number" @bind="year" />
+            </div>
+
+            <button type="button" class="action" disabled="@(busy || file is null)" @onclick="Run">
+                @(busy ? "Importing…" : "Run import")
+            </button>
+        </div>
+
+        @if (error is not null)
+        {
+            <p class="msg error">@error</p>
+        }
+
+        @if (result is not null)
+        {
+            <div class="card">
+                <h2>@(result.AlreadyImported ? "Already imported" : "Imported")</h2>
+
+                @if (!result.AlreadyImported)
+                {
+                    <div class="tally">
+                        <span><strong>@result.ExpensesRecorded</strong> expenses</span>
+                        <span><strong>@result.LinesRecorded</strong> lines</span>
+                        <span><strong>@result.CategoriesCreated</strong> categories +</span>
+                        <span><strong>@result.TagsCreated</strong> tags +</span>
+                    </div>
+
+                    @foreach (var month in result.Months)
+                    {
+                        <div class="rate-row">
+                            <span class="rate-pair">@month.Month</span>
+                            <span class="rate-src">
+                                @month.Expenses exp · @month.Lines lines · ֏@month.TotalAmd.ToString("N0", CultureInfo.InvariantCulture)
+                            </span>
+                        </div>
+                    }
+                }
+
+                @if (result.Warnings.Count > 0)
+                {
+                    <p class="warn-title">@result.Warnings.Count note(s)</p>
+                    @foreach (var warning in result.Warnings)
+                    {
+                        <p class="warn">@warning</p>
+                    }
+                }
+            </div>
+        }
+    }
+
+    <NavBar />
+</div>
+
+@code {
+    private IBrowserFile? file;
+    private int year;
+    private bool busy;
+    private string? error;
+    private ImportResult? result;
+
+    protected override void OnInitialized() =>
+        year = Clock.GetUtcNow().Year;
+
+    private void OnFile(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        result = null;
+        error = null;
+    }
+
+    private async Task Run()
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        result = null;
+        try
+        {
+            // Copy off the forward-only browser stream so the parser can read it fully.
+            using var buffer = new MemoryStream();
+            await file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(buffer);
+            buffer.Position = 0;
+            result = await Importer.ImportAsync(buffer, year);
+        }
+        catch (DomainException ex)
+        {
+            error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            error = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}
