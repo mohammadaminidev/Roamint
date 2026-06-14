@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Roamint.Application.Abstractions;
-using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Categories;
 using Roamint.Expenses.Infrastructure;
 
 namespace Roamint.Expenses.Contracts;

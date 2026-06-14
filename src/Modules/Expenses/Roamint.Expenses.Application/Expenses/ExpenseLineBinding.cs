@@ -1,40 +1,16 @@
-using Roamint.Application.Abstractions;
 using Roamint.Expenses.Domain;
 using Roamint.SharedKernel;
 
-namespace Roamint.Expenses.Application;
+namespace Roamint.Expenses.Application.Expenses;
 
-internal sealed class RecordExpenseHandler(
-    IExpenseRepository expenses,
-    ICategoryRepository categories,
-    ITagRepository tags,
-    IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<RecordExpense, ExpenseId>
+/// <summary>Shared line-binding for the expense write use cases. Validates referenced categories and tags
+/// and turns the command's <see cref="ExpenseLineInput"/> shapes into domain <see cref="ExpenseLineDraft"/>s.
+/// Both <see cref="RecordExpenseHandler"/> and <see cref="CorrectExpenseHandler"/> run the same checks.</summary>
+internal static class ExpenseLineBinding
 {
-    public async Task<ExpenseId> HandleAsync(RecordExpense command, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var currency = Currency.FromCode(command.CurrencyCode);
-        await EnsureActiveCategoriesAsync(categories, command.Lines, ct);
-        await EnsureCompatibleTagsAsync(tags, command.Lines, ct);
-
-        var id = ExpenseId.New(clock);
-        var expense = Expense.Record(
-            id,
-            command.OccurredOn,
-            ToDrafts(command.Lines, currency),
-            clock,
-            command.Note);
-
-        await expenses.AddAsync(expense, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-        return id;
-    }
-
     /// <summary>Validates every category referenced by the lines exists and is not archived. Distinct
     /// so a trip with many lines in the same category hits the repository once per category.</summary>
-    internal static async Task EnsureActiveCategoriesAsync(
+    public static async Task EnsureActiveCategoriesAsync(
         ICategoryRepository categories,
         IReadOnlyList<ExpenseLineInput> lines,
         CancellationToken ct)
@@ -56,7 +32,7 @@ internal sealed class RecordExpenseHandler(
     /// <summary>Validates every tag referenced by the lines exists, is active, and is scope-compatible with
     /// its line's category. Mirrors <see cref="EnsureActiveCategoriesAsync"/> and runs on both Record and
     /// Correct; the distinct referenced tags are loaded in one round trip.</summary>
-    internal static async Task EnsureCompatibleTagsAsync(
+    public static async Task EnsureCompatibleTagsAsync(
         ITagRepository tags,
         IReadOnlyList<ExpenseLineInput> lines,
         CancellationToken ct)
@@ -98,7 +74,7 @@ internal sealed class RecordExpenseHandler(
         }
     }
 
-    internal static IEnumerable<ExpenseLineDraft> ToDrafts(
+    public static IEnumerable<ExpenseLineDraft> ToDrafts(
         IReadOnlyList<ExpenseLineInput> lines,
         Currency currency)
     {
@@ -125,33 +101,5 @@ internal sealed class RecordExpenseHandler(
         }
 
         return Quantity.Of(line.QuantityValue.Value, line.QuantityUnit.Value);
-    }
-}
-
-internal sealed class CorrectExpenseHandler(
-    IExpenseRepository expenses,
-    ICategoryRepository categories,
-    ITagRepository tags,
-    IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<CorrectExpense>
-{
-    public async Task HandleAsync(CorrectExpense command, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var expense = await expenses.GetAsync(command.ExpenseId, ct)
-            ?? throw new ExpenseNotFoundException(command.ExpenseId);
-
-        var currency = Currency.FromCode(command.CurrencyCode);
-        await RecordExpenseHandler.EnsureActiveCategoriesAsync(categories, command.Lines, ct);
-        await RecordExpenseHandler.EnsureCompatibleTagsAsync(tags, command.Lines, ct);
-
-        expense.Correct(
-            command.OccurredOn,
-            RecordExpenseHandler.ToDrafts(command.Lines, currency),
-            clock,
-            command.Note);
-
-        await unitOfWork.SaveChangesAsync(ct);
     }
 }

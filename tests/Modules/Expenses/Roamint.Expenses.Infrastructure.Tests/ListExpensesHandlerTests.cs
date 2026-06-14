@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
-using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Queries;
 using Roamint.Expenses.Domain;
 using Roamint.SharedKernel;
 

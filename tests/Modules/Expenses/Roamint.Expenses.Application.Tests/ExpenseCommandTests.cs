@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Expenses;
 using Roamint.Expenses.Domain;
 using Roamint.SharedKernel;
 using Shouldly;

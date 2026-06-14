@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Roamint.Application.Abstractions;
-using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Queries;
 using Roamint.Expenses.Domain;
 
 namespace Roamint.Expenses.Infrastructure;

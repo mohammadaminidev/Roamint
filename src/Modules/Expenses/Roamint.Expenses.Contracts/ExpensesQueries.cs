@@ -1,5 +1,5 @@
 using Roamint.Application.Abstractions;
-using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Queries;
 
 namespace Roamint.Expenses.Contracts;
 

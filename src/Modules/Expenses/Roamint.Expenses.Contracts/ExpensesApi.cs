@@ -1,5 +1,7 @@
 using Roamint.Application.Abstractions;
-using Roamint.Expenses.Application;
+using Roamint.Expenses.Application.Categories;
+using Roamint.Expenses.Application.Expenses;
+using Roamint.Expenses.Application.Tags;
 using Roamint.Expenses.Domain;
 
 namespace Roamint.Expenses.Contracts;
