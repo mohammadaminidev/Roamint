@@ -22,9 +22,11 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+    // HTTPS redirect only outside dev: the phone-over-hotspot flow reaches the
+    // app over plain HTTP on the LAN, and the HTTPS port binds to localhost only.
+    app.UseHttpsRedirection();
 }
 
-app.UseHttpsRedirection();
 app.UseAntiforgery();
 app.MapStaticAssets();
 

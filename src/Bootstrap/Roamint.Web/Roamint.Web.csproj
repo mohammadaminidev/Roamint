@@ -1,5 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <PropertyGroup>
+    <!-- Standalone phone/LAN run loads ConnectionStrings:roamintdb from here in
+         Development; Aspire's injected env var overrides it when run normally.
+         See docs/features/0014-phone-lan-access.md. -->
+    <UserSecretsId>roamint-web-7c4a2f01</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\Hosting\Roamint.ServiceDefaults\Roamint.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\Modules\Expenses\Roamint.Expenses.Contracts\Roamint.Expenses.Contracts.csproj" />
