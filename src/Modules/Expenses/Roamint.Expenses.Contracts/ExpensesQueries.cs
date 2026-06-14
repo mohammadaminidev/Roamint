@@ -52,4 +52,14 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
                     .ToList()))
             .ToList();
     }
+
+    public async Task<IReadOnlyList<CategorySpendItem>> GetMonthlySummaryAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        var buckets = await queries.QueryAsync(new GetMonthlySummary(fromDate, toDate), ct);
+        return buckets
+            .Select(bucket => new CategorySpendItem(
+                bucket.CategoryId, bucket.CategoryName, bucket.CurrencyCode, bucket.Total))
+            .ToList();
+    }
 }

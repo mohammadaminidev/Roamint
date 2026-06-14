@@ -1,8 +1,9 @@
 # 0012 — Monthly summary (reports home)
 
 **Status:** In progress — landed: kernel `Irr→Irt` (step 1), Tabler icon font + emoji retrofit (step 4),
-Wallet admits `IRT` to canonical pairs + `/rates` IRT entry (step 2), list "View in" → USD/AMD/IRT. Next:
-`GetMonthlySummary` read model (step 3), then reports home (step 5).
+Wallet admits `IRT` to canonical pairs + `/rates` IRT entry (step 2), list "View in" → USD/AMD/IRT,
+`GetMonthlySummary` read model (step 3 — EF SQL `GROUP BY` (category × currency), Testcontainers tests,
+`IExpensesQueries.GetMonthlySummaryAsync` + `CategorySpendItem` DTO). Next: reports home (step 5).
 **Lands in (proposed):** `src/Modules/Expenses/Roamint.Expenses.Application/`,
 `src/Modules/Expenses/Roamint.Expenses.Infrastructure/`,
 `src/Modules/Expenses/Roamint.Expenses.Contracts/`, `src/Bootstrap/Roamint.Web/`,

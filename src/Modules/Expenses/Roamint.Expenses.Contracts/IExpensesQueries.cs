@@ -35,6 +35,15 @@ public interface IExpensesQueries
     /// </summary>
     Task<IReadOnlyList<ExpenseListItem>> ListExpensesAsync(
         DateOnly? fromDate = null, DateOnly? toDate = null, Guid? categoryFilter = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Per-(category, currency) spend sums over an inclusive date range, for the host to convert and
+    /// aggregate into a display-currency monthly summary. Category is line-level; currency is the expense's
+    /// original currency. The breakdown is raw and lossless — the host folds the currency buckets per
+    /// category, since latest-rate conversion is a host-side read concern (0012 D2).
+    /// </summary>
+    Task<IReadOnlyList<CategorySpendItem>> GetMonthlySummaryAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 }
 
 public sealed record CategoryListItem(Guid Id, string Name);
@@ -55,3 +64,7 @@ public sealed record ExpenseLineItem(
 /// derived from the lines; the host converts for display.</summary>
 public sealed record ExpenseListItem(
     Guid Id, DateOnly OccurredOn, string CurrencyCode, decimal Total, string? Note, IReadOnlyList<ExpenseLineItem> Lines);
+
+/// <summary>One bucket of spend: the total of all line amounts in a single (category × currency) pair over a
+/// date range. Unconverted — the host folds the buckets into a display-currency total per category.</summary>
+public sealed record CategorySpendItem(Guid CategoryId, string CategoryName, string CurrencyCode, decimal Total);

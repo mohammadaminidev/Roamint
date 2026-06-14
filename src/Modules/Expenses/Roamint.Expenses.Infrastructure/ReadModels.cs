@@ -250,6 +250,55 @@ internal sealed class ListExpensesHandler(ExpensesDbContext db)
     }
 }
 
+/// <summary>
+/// Read model for the monthly summary (0012). Groups line amounts by the line's category and the expense's
+/// currency over an inclusive date range, summing in SQL (<c>AsNoTracking</c>, no aggregate load), then
+/// resolves category names from the categories table in one extra round trip. Returns one row per
+/// (category × currency) — lossless and unconverted; the host folds the currency buckets into a single
+/// display currency. EF for now: the grouped <c>SUM</c> translates cleanly at personal scale; Dapper waits
+/// for the first read EF can't express (0012 D4).
+/// </summary>
+internal sealed class GetMonthlySummaryHandler(ExpensesDbContext db)
+    : IQueryHandler<GetMonthlySummary, IReadOnlyList<CategorySpendView>>
+{
+    public async Task<IReadOnlyList<CategorySpendView>> HandleAsync(GetMonthlySummary query, CancellationToken ct)
+    {
+        var buckets = await db.Expenses
+            .AsNoTracking()
+            .Where(expense => expense.OccurredOn >= query.From && expense.OccurredOn <= query.To)
+            .SelectMany(expense => expense.Lines)
+            .GroupBy(line => new { line.CategoryId, line.Amount.Currency })
+            .Select(group => new
+            {
+                group.Key.CategoryId,
+                group.Key.Currency,
+                Total = group.Sum(line => line.Amount.Amount),
+            })
+            .ToListAsync(ct);
+
+        if (buckets.Count == 0)
+        {
+            return [];
+        }
+
+        var categoryIds = buckets.Select(bucket => bucket.CategoryId).Distinct().ToList();
+        var nameById = (await db.Categories
+                .AsNoTracking()
+                .Where(category => categoryIds.Contains(category.Id))
+                .Select(category => new { category.Id, category.Name })
+                .ToListAsync(ct))
+            .ToDictionary(category => category.Id, category => category.Name);
+
+        return buckets
+            .Select(bucket => new CategorySpendView(
+                bucket.CategoryId.Value,
+                nameById.GetValueOrDefault(bucket.CategoryId, string.Empty),
+                bucket.Currency.Code,
+                bucket.Total))
+            .ToList();
+    }
+}
+
 /// <summary>SQL <c>LIKE</c>/<c>ILIKE</c> escaping for user-typed text, with an explicit escape char.</summary>
 file static class Like
 {
