@@ -24,6 +24,25 @@
   padding: 0;
 }
 
+/* Always reserve the scrollbar gutter so pages that don't scroll (Reports,
+   Categories) keep the same content width as scrolling pages — otherwise the
+   centered .phone and its sticky nav shift between routes. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* The layout's <main> is the flex item body centers. Without a width it
+   shrink-wraps to its content, so .phone's width:100% resolves against an
+   intrinsic width that varies per page — narrow pages (Reports, Categories)
+   render a narrower phone than wide ones (Expenses, Rates). Make it a
+   full-width centering column so .phone is always max-width-wide, page-agnostic. */
+.app-shell {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 body {
   font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
   background: var(--bg);
