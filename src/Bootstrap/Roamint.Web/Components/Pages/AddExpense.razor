@@ -1,10 +1,14 @@
 @page "/add"
 @using System.Globalization
 @using Roamint.Expenses.Contracts
+@using Roamint.Receipts.Contracts
 @using Roamint.SharedKernel
+@using Roamint.Web.Receipts
 @implements IDisposable
 @inject IExpensesApi Api
 @inject IExpensesQueries Queries
+@inject IReceiptsApi ReceiptsApi
+@inject ReceiptHandoff Handoff
 @inject TimeProvider Clock
 
 <PageTitle>Add expense · Roamint</PageTitle>
@@ -19,6 +23,15 @@
 
     <div class="card">
         <h2>New expense</h2>
+
+        @if (linkReceiptId is null)
+        {
+            <a class="scan-link" href="receipts/new"><i class="ti ti-camera" aria-hidden="true"></i> Scan a receipt instead</a>
+        }
+        else
+        {
+            <p class="hint">Reviewing a scanned receipt — check the items and pick a category for each.</p>
+        }
 
         <div class="amount-row">
             <input class="amount-input" type="text" value="@TotalDisplay" readonly />
@@ -226,6 +239,7 @@
     private bool submitting;
     private string? error;
     private string? success;
+    private Guid? linkReceiptId;
 
     private string? activeSuggestKey;
     private IReadOnlyList<ItemSuggestion> suggestions = [];
@@ -242,6 +256,60 @@
         categories = await Queries.ListActiveCategoriesAsync();
         allTags = await Queries.ListTagsAsync();
         lines.Add(NewLine());
+
+        // If we arrived from a scanned receipt, seed the form from its draft and suggest categories.
+        if (ApplyReceiptHandoff())
+        {
+            for (var i = 0; i < lines.Count; i++)
+            {
+                await SuggestCategoryFor(i, lines[i].Description);
+            }
+        }
+    }
+
+    // Seeds currency/date/lines from a handed-off receipt draft (descriptions + amounts; OCR units don't map
+    // to the form's g/ml/Pcs, and amounts are what matter). Returns true if a receipt is being reviewed.
+    private bool ApplyReceiptHandoff()
+    {
+        if (!Handoff.HasPending)
+        {
+            return false;
+        }
+
+        linkReceiptId = Handoff.ReceiptId;
+        var draft = Handoff.Draft;
+        Handoff.Clear();
+
+        if (draft is null)
+        {
+            return true;
+        }
+
+        if (draft.CurrencyCode is { Length: > 0 } code && Currencies.Any(currency => currency.Code == code))
+        {
+            currencyCode = code;
+        }
+
+        if (draft.Date is DateOnly parsedDate && parsedDate <= today)
+        {
+            date = parsedDate;
+        }
+
+        if (draft.Lines.Count > 0)
+        {
+            lines.Clear();
+            foreach (var draftLine in draft.Lines)
+            {
+                var row = NewLine();
+                row.Description = draftLine.Description;
+                row.AmountText = draftLine.Amount > 0m
+                    ? draftLine.Amount.ToString(CultureInfo.InvariantCulture)
+                    : string.Empty;
+                lines.Add(row);
+            }
+        }
+
+        return true;
     }
 
     private LineRow NewLine() => new() { CategoryId = categories is { Count: > 0 } ? categories[0].Id : null };
@@ -535,7 +603,14 @@
         try
         {
             var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
-            await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
+            var expenseId = await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
+
+            // If this expense came from a scanned receipt, link the two (host orchestration — 0015).
+            if (linkReceiptId is Guid receiptId)
+            {
+                await ReceiptsApi.LinkAsync(receiptId, expenseId);
+                linkReceiptId = null;
+            }
 
             success = $"Recorded {TotalDisplay} {currencyCode}.";
             noteText = string.Empty;

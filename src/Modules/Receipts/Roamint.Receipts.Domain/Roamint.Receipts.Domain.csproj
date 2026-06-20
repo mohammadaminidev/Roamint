@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../../../Shared/Roamint.SharedKernel/Roamint.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

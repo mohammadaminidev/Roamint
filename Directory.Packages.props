@@ -25,6 +25,13 @@
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
   </ItemGroup>
+  <ItemGroup Label="AI">
+    <!-- OCR via a config-driven IChatClient over an OpenAI-compatible endpoint (Gemini by
+         default; see docs/features/0015). Microsoft.Extensions.AI.OpenAI brings the OpenAI v2
+         client + the AsIChatClient bridge. -->
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
+  </ItemGroup>
   <ItemGroup Label="OpenTelemetry">
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Roamint.Receipts.Domain\Roamint.Receipts.Domain.csproj" />
+    <ProjectReference Include="..\..\..\Shared\Roamint.Application.Abstractions\Roamint.Application.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Roamint.Receipts.Application.Tests" />
+    <InternalsVisibleTo Include="Roamint.Receipts.Infrastructure" />
+  </ItemGroup>
+
+</Project>

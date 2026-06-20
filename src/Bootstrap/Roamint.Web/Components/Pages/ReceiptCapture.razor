@@ -1,0 +1,86 @@
+@page "/receipts/new"
+@using System.Diagnostics.CodeAnalysis
+@using Roamint.Receipts.Contracts
+@using Roamint.Web.Receipts
+@inject IReceiptsApi ReceiptsApi
+@inject ReceiptHandoff Handoff
+@inject NavigationManager Nav
+
+<PageTitle>Scan receipt · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Roamint
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="card">
+        <h2>Scan a receipt</h2>
+        <p class="hint">Take a photo of the receipt. We read the items and prices, then you review and assign
+            categories before saving.</p>
+
+        <label class="receipt-pick @(busy ? "is-busy" : null)">
+            <i class="ti ti-camera ic" aria-hidden="true"></i>
+            <span>@(busy ? "Reading the receipt…" : "Take photo / choose image")</span>
+            <InputFile OnChange="OnFile" accept="image/*" capture="environment" disabled="@busy" />
+        </label>
+
+        @if (busy)
+        {
+            <p class="hint">This takes a few seconds while the text is extracted.</p>
+        }
+        @if (error is not null)
+        {
+            <p class="error">@error</p>
+        }
+    </div>
+
+    <NavBar />
+</div>
+
+@code {
+    // Receipts are small phone photos; cap generously to reject accidental huge files.
+    private const long MaxBytes = 12L * 1024 * 1024;
+
+    private bool busy;
+    private string? error;
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Upload is a user action over IO + an external OCR call; any failure should surface as a "
+            + "friendly message on the page, not an unhandled circuit error.")]
+    private async Task OnFile(InputFileChangeEventArgs e)
+    {
+        error = null;
+        var file = e.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            using var buffer = new MemoryStream();
+            await using (var stream = file.OpenReadStream(MaxBytes))
+            {
+                await stream.CopyToAsync(buffer);
+            }
+
+            var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
+            var result = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(buffer.ToArray(), contentType));
+
+            // Hand the draft to the add-expense form and go there to review + categorize.
+            Handoff.Set(result.ReceiptId, result.Draft);
+            Nav.NavigateTo("/add");
+        }
+        catch (Exception ex)
+        {
+            error = $"Couldn't read that image: {ex.Message}";
+            busy = false;
+        }
+    }
+}

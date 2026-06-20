@@ -46,6 +46,12 @@
     <Project Path="src/Modules/Wallet/Roamint.Wallet.Domain/Roamint.Wallet.Domain.csproj" />
     <Project Path="src/Modules/Wallet/Roamint.Wallet.Infrastructure/Roamint.Wallet.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Receipts/">
+    <Project Path="src/Modules/Receipts/Roamint.Receipts.Application/Roamint.Receipts.Application.csproj" />
+    <Project Path="src/Modules/Receipts/Roamint.Receipts.Contracts/Roamint.Receipts.Contracts.csproj" />
+    <Project Path="src/Modules/Receipts/Roamint.Receipts.Domain/Roamint.Receipts.Domain.csproj" />
+    <Project Path="src/Modules/Receipts/Roamint.Receipts.Infrastructure/Roamint.Receipts.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/Bootstrap/">
     <Project Path="tests/Bootstrap/Roamint.Web.Tests/Roamint.Web.Tests.csproj" />
@@ -65,5 +71,10 @@
     <Project Path="tests/Modules/Wallet/Roamint.Wallet.Contracts.Tests/Roamint.Wallet.Contracts.Tests.csproj" />
     <Project Path="tests/Modules/Wallet/Roamint.Wallet.Domain.Tests/Roamint.Wallet.Domain.Tests.csproj" />
     <Project Path="tests/Modules/Wallet/Roamint.Wallet.Infrastructure.Tests/Roamint.Wallet.Infrastructure.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tests/Modules/Receipts/">
+    <Project Path="tests/Modules/Receipts/Roamint.Receipts.Application.Tests/Roamint.Receipts.Application.Tests.csproj" />
+    <Project Path="tests/Modules/Receipts/Roamint.Receipts.Domain.Tests/Roamint.Receipts.Domain.Tests.csproj" />
+    <Project Path="tests/Modules/Receipts/Roamint.Receipts.Infrastructure.Tests/Roamint.Receipts.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

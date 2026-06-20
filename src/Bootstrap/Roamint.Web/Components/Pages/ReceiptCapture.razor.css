@@ -1,0 +1,103 @@
+.phone {
+    width: 100%;
+    max-width: 430px;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+}
+
+header {
+    padding: 18px 20px 12px;
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, var(--bg) 70%, transparent);
+    z-index: 5;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    font-size: 1.15rem;
+}
+
+.brand .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+}
+
+.brand small {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.72rem;
+    margin-left: auto;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    margin: 14px 20px 0;
+    padding: 18px 18px 20px;
+}
+
+.card h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.receipt-pick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 30px 18px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.receipt-pick .ic {
+    font-size: 1.9rem;
+    color: var(--accent);
+}
+
+.receipt-pick.is-busy {
+    opacity: 0.6;
+    cursor: progress;
+}
+
+.receipt-pick input[type="file"] {
+    display: none;
+}
+
+.error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-top: 12px;
+}

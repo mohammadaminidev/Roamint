@@ -23,11 +23,15 @@ See [`docs/features/`](docs/features) for per-slice design records (`0001`–`00
 - [x] Monthly summary — reports home (`/`) with per-category totals in AMD / USD / IRT (toman), prior-month delta, and missing-rate routing to the rate page
 - [ ] Category management — create, rename, archive, merge (no destructive delete)
 
-### V2 — not yet scoped
+### V2 — in progress
 
-- Receipt photo OCR (Receipts module)
-- Natural-language queries over expenses (Insights module)
-- Spreadsheet export / import
+- [x] Receipt photo OCR (Receipts module) — photograph a receipt, OCR extracts
+  items/prices via Gemini 2.5 Flash (reads Armenian), review + assign categories in the
+  add-expense form, link to the recorded expense. Config-driven provider over an
+  OpenAI-compatible endpoint; stub fallback when no key. See `docs/features/0015`.
+- [ ] Natural-language queries over expenses (Insights module) — the feature that
+  motivates the outbox drain.
+- [ ] Spreadsheet export (import landed dev-only in 0013).
 
 ### V3+ — later
 
