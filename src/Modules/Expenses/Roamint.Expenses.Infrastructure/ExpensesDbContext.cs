@@ -24,11 +24,14 @@ internal sealed class ExpensesDbContext : DbContext
 
     public DbSet<Expense> Expenses => Set<Expense>();
 
+    public DbSet<ItemMapping> ItemMappings => Set<ItemMapping>();
+
     internal DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.HasPostgresExtension("vector"); // pgvector, for item-mapping embeddings (0016).
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ExpensesDbContext).Assembly);
     }
 
@@ -38,6 +41,7 @@ internal sealed class ExpensesDbContext : DbContext
         configurationBuilder.Properties<ExpenseId>().HaveConversion<ExpenseIdConverter>();
         configurationBuilder.Properties<ExpenseLineId>().HaveConversion<ExpenseLineIdConverter>();
         configurationBuilder.Properties<TagId>().HaveConversion<TagIdConverter>();
+        configurationBuilder.Properties<ItemMappingId>().HaveConversion<ItemMappingIdConverter>();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

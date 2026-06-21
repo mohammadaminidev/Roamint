@@ -21,7 +21,8 @@ public sealed record DraftLineView(
     string Description,
     decimal Amount,
     decimal? QuantityValue,
-    string? QuantityUnit);
+    string? QuantityUnit,
+    string? SourceText);
 
 /// <summary>Fetches a receipt's current state for the review screen; null if the id is unknown.</summary>
 public sealed record GetReceipt(ReceiptId ReceiptId) : IQuery<ReceiptView?>;

@@ -1,8 +1,10 @@
 @page "/receipts/new"
 @using System.Diagnostics.CodeAnalysis
+@using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
 @using Roamint.Web.Receipts
 @inject IReceiptsApi ReceiptsApi
+@inject IExpensesQueries ExpensesQueries
 @inject ReceiptHandoff Handoff
 @inject NavigationManager Nav
 
@@ -73,8 +75,31 @@
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
             var result = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(buffer.ToArray(), contentType));
 
-            // Hand the draft to the add-expense form and go there to review + categorize.
-            Handoff.Set(result.ReceiptId, result.Draft);
+            // Resolve each line against the learned item vocabulary (0016): a match shows the remembered
+            // canonical name + category + unit; a miss shows the first-time Farsi translation.
+            var seedLines = new List<ReceiptLineSeed>();
+            foreach (var line in result.Draft?.Lines ?? [])
+            {
+                Guid? categoryId = null;
+                string? unit = null;
+                var description = line.Description;
+
+                if (!string.IsNullOrWhiteSpace(line.SourceText))
+                {
+                    var match = await ExpensesQueries.MatchItemAsync(line.SourceText);
+                    if (match is not null)
+                    {
+                        description = match.CanonicalDescription;
+                        categoryId = match.CategoryId;
+                        unit = match.Unit;
+                    }
+                }
+
+                seedLines.Add(new ReceiptLineSeed(line.SourceText, description, line.Amount, categoryId, unit));
+            }
+
+            // Hand the seeded lines to the add-expense form and go there to review + confirm.
+            Handoff.Set(new ReceiptSeed(result.ReceiptId, result.Draft?.CurrencyCode, result.Draft?.Date, seedLines));
             Nav.NavigateTo("/add");
         }
         catch (Exception ex)

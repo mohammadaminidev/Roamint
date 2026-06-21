@@ -34,4 +34,5 @@ public sealed record ParsedLineDto(
     string Description,
     decimal Amount,
     decimal? QuantityValue,
-    string? QuantityUnit);
+    string? QuantityUnit,
+    string? SourceText);

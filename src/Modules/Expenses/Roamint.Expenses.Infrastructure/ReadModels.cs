@@ -1,5 +1,9 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Pgvector;
 using Roamint.Application.Abstractions;
+using Roamint.Expenses.Application;
 using Roamint.Expenses.Application.Queries;
 using Roamint.Expenses.Domain;
 
@@ -296,6 +300,65 @@ internal sealed class GetMonthlySummaryHandler(ExpensesDbContext db)
                 bucket.Currency.Code,
                 bucket.Total))
             .ToList();
+    }
+}
+
+/// <summary>
+/// Resolves external item text to a learned <see cref="ItemMapping"/> by embedding nearest-neighbour (0016).
+/// Embeds the (whitespace-normalised) text with <see cref="IItemEmbedder"/>, then a pgvector cosine-distance
+/// search (<c>&lt;=&gt;</c>) over <c>item_mappings</c> via a raw command on the EF connection (the vector type
+/// is registered on that data source). Returns the nearest mapping within the distance cutoff, else null.
+/// </summary>
+internal sealed class MatchItemHandler(ExpensesDbContext db, IItemEmbedder embedder)
+    : IQueryHandler<MatchItem, ItemMatchView?>
+{
+    // Cosine distance = 1 − similarity. ~0.65 similarity → ~0.35 distance (0016 smoke test). Tune on real use.
+    private const double MaxDistance = 0.35;
+
+    public async Task<ItemMatchView?> HandleAsync(MatchItem query, CancellationToken ct)
+    {
+        var trimmed = query.SourceText?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+        {
+            return null;
+        }
+
+        // Match the write-side whitespace normalisation so query and stored embeddings are comparable.
+        var normalized = string.Join(' ', trimmed.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var vector = new Vector(await embedder.EmbedAsync(normalized, ct));
+
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync(ct);
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"""
+            SELECT canonical_description, unit, category_id, embedding <=> $1 AS distance
+            FROM {ExpensesDbContext.Schema}.item_mappings
+            WHERE embedding IS NOT NULL
+            ORDER BY embedding <=> $1
+            LIMIT 1
+            """;
+        command.Parameters.Add(new NpgsqlParameter { Value = vector });
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            return null;
+        }
+
+        var distance = reader.GetDouble(3);
+        if (distance > MaxDistance)
+        {
+            return null;
+        }
+
+        var description = reader.GetString(0);
+        var unit = await reader.IsDBNullAsync(1, ct) ? null : reader.GetString(1);
+        var categoryId = reader.GetGuid(2);
+        return new ItemMatchView(description, unit, new CategoryId(categoryId));
     }
 }
 

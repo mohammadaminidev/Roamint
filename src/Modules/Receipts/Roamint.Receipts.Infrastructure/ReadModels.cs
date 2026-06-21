@@ -28,7 +28,8 @@ internal sealed class GetReceiptHandler(ReceiptsDbContext db)
                 receipt.Draft.Date,
                 receipt.Draft.CurrencyCode,
                 receipt.Draft.Lines
-                    .Select(line => new DraftLineView(line.Description, line.Amount, line.QuantityValue, line.QuantityUnit))
+                    .Select(line => new DraftLineView(
+                        line.Description, line.Amount, line.QuantityValue, line.QuantityUnit, line.SourceText))
                     .ToList());
 
         return new ReceiptView(

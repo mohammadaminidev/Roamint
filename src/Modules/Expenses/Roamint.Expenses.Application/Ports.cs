@@ -33,6 +33,26 @@ public interface IExpenseRepository
     Task AddAsync(Expense expense, CancellationToken ct);
 }
 
+/// <summary>Write-side access to learned <see cref="ItemMapping"/>s. The embedding is supplied alongside the
+/// aggregate — it is an Infrastructure concern (the domain holds no vector). Upsert is by normalised source
+/// text; recognition for reads is by embedding (see <c>MatchItem</c>), not this exact key.</summary>
+public interface IItemMappingRepository
+{
+    Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct);
+
+    Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct);
+
+    /// <summary>Persist a revised mapping's recomputed embedding.</summary>
+    Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct);
+}
+
+/// <summary>Produces an embedding vector for item text (local bge-m3 by default; see 0016). The matching and
+/// learning handlers depend only on this; the model and endpoint are an Infrastructure concern.</summary>
+public interface IItemEmbedder
+{
+    Task<float[]> EmbedAsync(string text, CancellationToken ct);
+}
+
 /// <summary>Commits the work of a single use case. The transactional outbox will hook here, persisting
 /// buffered domain events alongside the aggregate in one transaction.</summary>
 public interface IUnitOfWork

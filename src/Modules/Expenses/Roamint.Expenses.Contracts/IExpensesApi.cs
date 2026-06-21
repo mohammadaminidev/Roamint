@@ -24,7 +24,20 @@ public interface IExpensesApi
     Task<Guid> RecordExpenseAsync(RecordExpenseRequest request, CancellationToken ct = default);
 
     Task CorrectExpenseAsync(Guid expenseId, CorrectExpenseRequest request, CancellationToken ct = default);
+
+    /// <summary>Learns (or updates) the mapping from external item text (e.g. an Armenian receipt line) to a
+    /// canonical item — the user's final description, unit, and category — with its embedding. A later
+    /// confirmation of the same source wins, so a rename re-points it (0016).</summary>
+    Task RecordItemMappingAsync(RecordItemMappingRequest request, CancellationToken ct = default);
 }
+
+/// <summary>A learned item mapping to record. <see cref="SourceText"/> is the external text (Armenian receipt
+/// line); the rest is the canonical resolution the user confirmed.</summary>
+public sealed record RecordItemMappingRequest(
+    string SourceText,
+    string CanonicalDescription,
+    string? Unit,
+    Guid CategoryId);
 
 public sealed record CreateCategoryRequest(string Name);
 

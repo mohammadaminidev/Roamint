@@ -78,6 +78,43 @@ internal sealed class InMemoryTagRepository : ITagRepository
     public IReadOnlyCollection<Tag> All => _store.Values;
 }
 
+internal sealed class InMemoryItemMappingRepository : IItemMappingRepository
+{
+    private readonly Dictionary<string, ItemMapping> _byText = [];
+
+    public Dictionary<ItemMappingId, float[]> Embeddings { get; } = [];
+
+    public Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct) =>
+        Task.FromResult(_byText.GetValueOrDefault(normalizedSourceText));
+
+    public Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    {
+        _byText[mapping.SourceText] = mapping;
+        Embeddings[mapping.Id] = embedding;
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    {
+        _byText[mapping.SourceText] = mapping;
+        Embeddings[mapping.Id] = embedding;
+        return Task.CompletedTask;
+    }
+
+    public IReadOnlyCollection<ItemMapping> All => _byText.Values;
+}
+
+internal sealed class FakeItemEmbedder : IItemEmbedder
+{
+    public List<string> Embedded { get; } = [];
+
+    public Task<float[]> EmbedAsync(string text, CancellationToken ct)
+    {
+        Embedded.Add(text);
+        return Task.FromResult(new[] { 0.1f, 0.2f, 0.3f });
+    }
+}
+
 internal sealed class FakeUnitOfWork : IUnitOfWork
 {
     public int SaveCount { get; private set; }

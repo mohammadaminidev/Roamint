@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 using Roamint.Expenses.Infrastructure;
 
 #nullable disable
@@ -22,6 +23,7 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "vector");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Roamint.Expenses.Domain.Category", b =>
@@ -107,6 +109,49 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                     b.HasIndex("expense_id");
 
                     b.ToTable("expense_lines", "expenses");
+                });
+
+            modelBuilder.Entity("Roamint.Expenses.Domain.ItemMapping", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CanonicalDescription")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("canonical_description");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<Vector>("Embedding")
+                        .HasColumnType("vector(1024)")
+                        .HasColumnName("embedding");
+
+                    b.Property<DateTimeOffset>("LastUsedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_on_utc");
+
+                    b.Property<string>("SourceText")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("source_text");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("unit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceText")
+                        .HasDatabaseName("ix_item_mappings_source_text");
+
+                    b.ToTable("item_mappings", "expenses");
                 });
 
             modelBuilder.Entity("Roamint.Expenses.Domain.Tag", b =>

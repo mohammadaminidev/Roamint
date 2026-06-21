@@ -17,12 +17,15 @@ public sealed record ParsedDraft(
 }
 
 /// <summary>
-/// One extracted line item. <see cref="QuantityValue"/> and <see cref="QuantityUnit"/> travel together
-/// (both or neither). The unit is a raw string code, not the Expenses domain's <c>QuantityUnit</c> —
+/// One extracted line item. <see cref="Description"/> is the Farsi translation (for first-time display);
+/// <see cref="SourceText"/> is the item name as printed (Armenian), used by the host to match/learn against
+/// the Expenses item vocabulary (0016). <see cref="QuantityValue"/> and <see cref="QuantityUnit"/> travel
+/// together (both or neither); the unit is a raw string code, not the Expenses domain's <c>QuantityUnit</c> —
 /// Receipts must not depend on Expenses; the web host maps the code when binding the review form.
 /// </summary>
 public sealed record ParsedLine(
     string Description,
     decimal Amount,
     decimal? QuantityValue = null,
-    string? QuantityUnit = null);
+    string? QuantityUnit = null,
+    string? SourceText = null);

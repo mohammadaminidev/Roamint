@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Pgvector.EntityFrameworkCore;
 
 namespace Roamint.Expenses.Infrastructure;
 
@@ -13,7 +14,9 @@ internal sealed class ExpensesDbContextFactory : IDesignTimeDbContextFactory<Exp
     public ExpensesDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<ExpensesDbContext>()
-            .UseNpgsql("Host=localhost;Database=roamint_design;Username=postgres;Password=postgres")
+            .UseNpgsql(
+                "Host=localhost;Database=roamint_design;Username=postgres;Password=postgres",
+                npgsql => npgsql.UseVector())
             .Options;
 
         return new ExpensesDbContext(options, TimeProvider.System);

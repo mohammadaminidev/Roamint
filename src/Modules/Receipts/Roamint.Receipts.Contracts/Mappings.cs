@@ -13,6 +13,7 @@ internal static class Mappings
                 draft.Date,
                 draft.CurrencyCode,
                 draft.Lines
-                    .Select(line => new ParsedLineDto(line.Description, line.Amount, line.QuantityValue, line.QuantityUnit))
+                    .Select(line => new ParsedLineDto(
+                        line.Description, line.Amount, line.QuantityValue, line.QuantityUnit, line.SourceText))
                     .ToList());
 }

@@ -29,6 +29,13 @@ public interface IExpensesQueries
     Task<Guid?> SuggestCategoryAsync(string itemText, CancellationToken ct = default);
 
     /// <summary>
+    /// Resolves external item text (e.g. an Armenian receipt line) to a learned canonical item by embedding
+    /// similarity, or null when nothing is close enough (a new item). Used by the receipt flow to show the
+    /// remembered mapping instead of re-translating (0016).
+    /// </summary>
+    Task<ItemMatchDto?> MatchItemAsync(string sourceText, CancellationToken ct = default);
+
+    /// <summary>
     /// Expenses newest-first for the list screen, in their original currency (conversion is composed by the
     /// host). Optionally bounded by a date range; <paramref name="categoryFilter"/> matches an expense when
     /// any line is in that category. Currency is a display denomination, not a filter.
@@ -47,6 +54,10 @@ public interface IExpensesQueries
 }
 
 public sealed record CategoryListItem(Guid Id, string Name);
+
+/// <summary>A learned item resolution: the canonical description, quantity unit (canonical code or null), and
+/// category to apply to a matched receipt line.</summary>
+public sealed record ItemMatchDto(string CanonicalDescription, string? Unit, Guid CategoryId);
 
 /// <summary>A selectable tag. <see cref="Scope"/> is null for a global tag, else the category it's scoped to.</summary>
 public sealed record TagListItem(Guid Id, string Name, Guid? Scope);

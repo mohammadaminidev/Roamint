@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
+using Pgvector.EntityFrameworkCore;
 using Roamint.Expenses.Infrastructure;
 using Testcontainers.PostgreSql;
 
@@ -26,7 +27,9 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
     internal ExpensesDbContext CreateContext(TimeProvider clock) =>
-        new(new DbContextOptionsBuilder<ExpensesDbContext>().UseNpgsql(ConnectionString).Options, clock);
+        new(new DbContextOptionsBuilder<ExpensesDbContext>()
+            .UseNpgsql(ConnectionString, npgsql => npgsql.UseVector())
+            .Options, clock);
 }
 
 [CollectionDefinition(nameof(PostgresCollection))]

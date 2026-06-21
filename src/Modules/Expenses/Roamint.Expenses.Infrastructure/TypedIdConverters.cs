@@ -23,6 +23,11 @@ internal sealed class TagIdConverter : ValueConverter<TagId, Guid>
     public TagIdConverter() : base(id => id.Value, value => new TagId(value)) { }
 }
 
+internal sealed class ItemMappingIdConverter : ValueConverter<ItemMappingId, Guid>
+{
+    public ItemMappingIdConverter() : base(id => id.Value, value => new ItemMappingId(value)) { }
+}
+
 /// <summary>Stores a <see cref="QuantityUnit"/> as its canonical code (<c>"g"</c>/<c>"ml"</c>/<c>"Pcs"</c>)
 /// so quantity reports read and aggregate on a stable, human-legible column.</summary>
 internal sealed class QuantityUnitConverter : ValueConverter<QuantityUnit, string>

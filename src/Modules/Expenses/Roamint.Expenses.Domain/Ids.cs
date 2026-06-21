@@ -23,3 +23,9 @@ public readonly record struct TagId(Guid Value)
 {
     public static TagId New(TimeProvider clock) => new(Guid.CreateVersion7(clock.GetUtcNow()));
 }
+
+/// <summary>Identity of an <see cref="ItemMapping"/> aggregate.</summary>
+public readonly record struct ItemMappingId(Guid Value)
+{
+    public static ItemMappingId New(TimeProvider clock) => new(Guid.CreateVersion7(clock.GetUtcNow()));
+}

@@ -1,6 +1,7 @@
 using Roamint.Application.Abstractions;
 using Roamint.Expenses.Application.Categories;
 using Roamint.Expenses.Application.Expenses;
+using Roamint.Expenses.Application.ItemMappings;
 using Roamint.Expenses.Application.Tags;
 using Roamint.Expenses.Domain;
 
@@ -62,6 +63,18 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
                 request.OccurredOn,
                 ToLines(request.Lines),
                 request.Note),
+            ct);
+    }
+
+    public Task RecordItemMappingAsync(RecordItemMappingRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return commands.SendAsync(
+            new RecordItemMapping(
+                request.SourceText,
+                request.CanonicalDescription,
+                request.Unit,
+                new CategoryId(request.CategoryId)),
             ct);
     }
 

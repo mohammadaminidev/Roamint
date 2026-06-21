@@ -29,6 +29,10 @@ See [`docs/features/`](docs/features) for per-slice design records (`0001`–`00
   items/prices via Gemini 2.5 Flash (reads Armenian), review + assign categories in the
   add-expense form, link to the recorded expense. Config-driven provider over an
   OpenAI-compatible endpoint; stub fallback when no key. See `docs/features/0015`.
+- [x] Receipt item matching (Expenses) — receipt items are translated to Farsi and matched
+  to your vocabulary by embedding similarity (local `bge-m3` + pgvector); a confirmed rename
+  is learned, so the next receipt resolves the item (name + unit + category) automatically.
+  See `docs/features/0016`.
 - [ ] Natural-language queries over expenses (Insights module) — the feature that
   motivates the outbox drain.
 - [ ] Spreadsheet export (import landed dev-only in 0013).

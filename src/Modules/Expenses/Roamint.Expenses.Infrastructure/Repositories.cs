@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Pgvector;
 using Roamint.Expenses.Application;
 using Roamint.Expenses.Domain;
 
@@ -65,6 +66,25 @@ internal sealed class ExpenseRepository(ExpensesDbContext db) : IExpenseReposito
     public Task AddAsync(Expense expense, CancellationToken ct)
     {
         db.Expenses.Add(expense);
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class ItemMappingRepository(ExpensesDbContext db) : IItemMappingRepository
+{
+    public Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct) =>
+        db.ItemMappings.FirstOrDefaultAsync(mapping => mapping.SourceText == normalizedSourceText, ct);
+
+    public Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    {
+        var entry = db.ItemMappings.Add(mapping);
+        entry.Property("Embedding").CurrentValue = new Vector(embedding); // set the shadow vector column.
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    {
+        db.Entry(mapping).Property("Embedding").CurrentValue = new Vector(embedding);
         return Task.CompletedTask;
     }
 }

@@ -21,10 +21,17 @@ internal sealed class ChatClientReceiptOcr(IChatClient chat) : IReceiptOcr
           "merchant": string|null,
           "date": "YYYY-MM-DD"|null,
           "currencyCode": string|null,
-          "lines": [ { "description": string, "amount": number, "quantityValue": number|null, "quantityUnit": string|null } ]
+          "lines": [ {
+            "sourceText": string,
+            "description": string,
+            "amount": number,
+            "quantityValue": number|null,
+            "quantityUnit": string|null
+          } ]
         }
-        Preserve the original language and script of product descriptions (e.g. Armenian). "amount" is the
-        line total actually paid. Do NOT include subtotal, tax, or grand-total rows in "lines".
+        For each line: "sourceText" is the item name EXACTLY as printed (keep the original language and
+        script, e.g. Armenian); "description" is a concise Farsi (Persian) translation of that item name.
+        "amount" is the line total actually paid. Do NOT include subtotal, tax, or grand-total rows in "lines".
         """;
 
     public async Task<ParsedDraft> ExtractAsync(byte[] image, string contentType, CancellationToken ct)
@@ -63,8 +70,13 @@ internal sealed class ChatClientReceiptOcr(IChatClient chat) : IReceiptOcr
         }
 
         var lines = (dto.Lines ?? [])
-            .Where(line => !string.IsNullOrWhiteSpace(line.Description))
-            .Select(line => new ParsedLine(line.Description!, line.Amount ?? 0m, line.QuantityValue, line.QuantityUnit))
+            .Where(line => !string.IsNullOrWhiteSpace(line.Description) || !string.IsNullOrWhiteSpace(line.SourceText))
+            .Select(line => new ParsedLine(
+                NullIfBlank(line.Description) ?? line.SourceText!,
+                line.Amount ?? 0m,
+                line.QuantityValue,
+                line.QuantityUnit,
+                NullIfBlank(line.SourceText)))
             .ToList();
 
         DateOnly? date = DateOnly.TryParse(dto.Date, out var parsed) ? parsed : null;
@@ -89,7 +101,8 @@ internal sealed class ChatClientReceiptOcr(IChatClient chat) : IReceiptOcr
 
     private sealed record DraftDto(string? Merchant, string? Date, string? CurrencyCode, List<LineDto>? Lines);
 
-    private sealed record LineDto(string? Description, decimal? Amount, decimal? QuantityValue, string? QuantityUnit);
+    private sealed record LineDto(
+        string? SourceText, string? Description, decimal? Amount, decimal? QuantityValue, string? QuantityUnit);
 }
 
 /// <summary>OCR fallback when no API key/endpoint is configured (e.g. the GPU-less production host). Returns

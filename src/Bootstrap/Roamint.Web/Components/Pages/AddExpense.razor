@@ -1,4 +1,5 @@
 @page "/add"
+@using System.Diagnostics.CodeAnalysis
 @using System.Globalization
 @using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
@@ -203,6 +204,10 @@
         public string QuantityText { get; set; } = string.Empty;
         public string? Unit { get; set; }
         public List<Guid> TagIds { get; } = [];
+
+        // Set for lines seeded from a receipt — the original (Armenian) text, used to learn the item mapping
+        // on confirm. Null for hand-added lines.
+        public string? SourceText { get; set; }
     }
 
     // The transactable currencies the form offers. IRT is display-only (toman view, later) and not here.
@@ -267,8 +272,9 @@
         }
     }
 
-    // Seeds currency/date/lines from a handed-off receipt draft (descriptions + amounts; OCR units don't map
-    // to the form's g/ml/Pcs, and amounts are what matter). Returns true if a receipt is being reviewed.
+    // Seeds currency/date/lines from a handed-off receipt. Matched lines (resolved against the learned item
+    // vocabulary, 0016) arrive with their canonical description + category + unit; unmatched lines carry the
+    // first-time Farsi translation and get a category suggestion below. Returns true if a receipt is reviewed.
     private bool ApplyReceiptHandoff()
     {
         if (!Handoff.HasPending)
@@ -276,43 +282,84 @@
             return false;
         }
 
-        linkReceiptId = Handoff.ReceiptId;
-        var draft = Handoff.Draft;
+        var seed = Handoff.Pending!;
         Handoff.Clear();
+        linkReceiptId = seed.ReceiptId;
 
-        if (draft is null)
-        {
-            return true;
-        }
-
-        if (draft.CurrencyCode is { Length: > 0 } code && Currencies.Any(currency => currency.Code == code))
+        if (seed.CurrencyCode is { Length: > 0 } code && Currencies.Any(currency => currency.Code == code))
         {
             currencyCode = code;
         }
 
-        if (draft.Date is DateOnly parsedDate && parsedDate <= today)
+        if (seed.Date is DateOnly parsedDate && parsedDate <= today)
         {
             date = parsedDate;
         }
 
-        if (draft.Lines.Count > 0)
+        if (seed.Lines.Count == 0)
         {
-            lines.Clear();
-            foreach (var draftLine in draft.Lines)
+            return true;
+        }
+
+        lines.Clear();
+        foreach (var seedLine in seed.Lines)
+        {
+            var row = NewLine();
+            row.SourceText = seedLine.SourceText;
+            row.Description = seedLine.Description;
+            row.AmountText = seedLine.Amount > 0m
+                ? seedLine.Amount.ToString(CultureInfo.InvariantCulture)
+                : string.Empty;
+
+            // A learned match is authoritative — pin its category (so the suggestion pass skips it) and unit.
+            if (seedLine.CategoryId is Guid matchedCategory && categories!.Any(category => category.Id == matchedCategory))
             {
-                var row = NewLine();
-                row.Description = draftLine.Description;
-                row.AmountText = draftLine.Amount > 0m
-                    ? draftLine.Amount.ToString(CultureInfo.InvariantCulture)
-                    : string.Empty;
-                lines.Add(row);
+                row.CategoryId = matchedCategory;
+                row.UserPickedCategory = true;
             }
+
+            if (seedLine.Unit is { Length: > 0 } unit && Units.Contains(unit))
+            {
+                row.Unit = unit;
+            }
+
+            lines.Add(row);
         }
 
         return true;
     }
 
     private LineRow NewLine() => new() { CategoryId = categories is { Count: > 0 } ? categories[0].Id : null };
+
+    // Records each receipt-sourced line's mapping (Armenian source → confirmed Farsi name + unit + category)
+    // so the next receipt with that item resolves it automatically (0016). Best-effort: the expense is already
+    // saved, so a learning failure (e.g. the embedder is offline) must not surface as an error.
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Learning is best-effort over an external embedder; failures are swallowed so they "
+            + "never block the already-recorded expense.")]
+    private async Task LearnItemMappingsAsync()
+    {
+        foreach (var line in lines)
+        {
+            var source = line.SourceText?.Trim();
+            var description = line.Description.Trim();
+            if (string.IsNullOrEmpty(source) || description.Length == 0 || line.CategoryId is not Guid categoryId)
+            {
+                continue;
+            }
+
+            try
+            {
+                await Api.RecordItemMappingAsync(new RecordItemMappingRequest(source, description, line.Unit, categoryId));
+            }
+            catch (Exception)
+            {
+                // Swallow — see attribute.
+            }
+        }
+    }
 
     private void SelectCurrency(string code)
     {
@@ -605,10 +652,12 @@
             var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
             var expenseId = await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
 
-            // If this expense came from a scanned receipt, link the two (host orchestration — 0015).
+            // If this expense came from a scanned receipt, link the two (host orchestration — 0015) and learn
+            // each line's mapping so the next receipt resolves it automatically (0016).
             if (linkReceiptId is Guid receiptId)
             {
                 await ReceiptsApi.LinkAsync(receiptId, expenseId);
+                await LearnItemMappingsAsync();
                 linkReceiptId = null;
             }
 

@@ -30,6 +30,12 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
     public Task<Guid?> SuggestCategoryAsync(string itemText, CancellationToken ct = default) =>
         queries.QueryAsync(new SuggestCategory(itemText), ct);
 
+    public async Task<ItemMatchDto?> MatchItemAsync(string sourceText, CancellationToken ct = default)
+    {
+        var match = await queries.QueryAsync(new MatchItem(sourceText), ct);
+        return match is null ? null : new ItemMatchDto(match.CanonicalDescription, match.Unit, match.CategoryId.Value);
+    }
+
     public async Task<IReadOnlyList<ExpenseListItem>> ListExpensesAsync(
         DateOnly? fromDate = null, DateOnly? toDate = null, Guid? categoryFilter = null, CancellationToken ct = default)
     {
