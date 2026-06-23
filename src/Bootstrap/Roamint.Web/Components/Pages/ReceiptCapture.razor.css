@@ -79,6 +79,75 @@ header {
     font-size: 0.95rem;
     text-align: center;
     cursor: pointer;
+    width: 100%;
+}
+
+/* The "Use camera" button is a <button>; reset native chrome to match the file <label>. */
+button.receipt-pick {
+    font-family: inherit;
+    appearance: none;
+}
+
+.receipt-pick.file {
+    margin-top: 12px;
+    padding: 22px 18px;
+    border-style: solid;
+}
+
+.viewfinder {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.viewfinder.is-hidden {
+    display: none;
+}
+
+.viewfinder video {
+    width: 100%;
+    border-radius: 14px;
+    background: #000;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+}
+
+.viewfinder-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.viewfinder-actions button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px;
+    border-radius: 12px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: 1px solid var(--border);
+}
+
+.viewfinder-actions .cap {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+}
+
+.viewfinder-actions .ghost {
+    background: var(--surface-2);
+    color: var(--text);
+    flex: 0 0 35%;
+}
+
+.viewfinder-actions button:disabled {
+    opacity: 0.6;
+    cursor: progress;
 }
 
 .receipt-pick .ic {
@@ -91,8 +160,46 @@ header {
     cursor: progress;
 }
 
-.receipt-pick input[type="file"] {
+/* InputFile renders its <input> as a child component, which doesn't carry this
+   component's scoped-CSS attribute — so ::deep is required to actually hide the native
+   file control. Without it the ugly "Choose File / No file chosen" button shows and
+   breaks the centering. The wrapping <label> still opens the picker on tap. */
+.receipt-pick ::deep input[type="file"] {
     display: none;
+}
+
+.processing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 34px 18px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+    text-align: center;
+}
+
+.spinner {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.processing-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text);
 }
 
 .error {

@@ -31,6 +31,7 @@ if (-not $pg) {
     if ($stopped) {
         Write-Host "Starting Postgres container $stopped ..." -ForegroundColor Cyan
         docker start $stopped | Out-Null
+        $pg = $stopped
     }
     else {
         Write-Warning "No Postgres container found. Run the Aspire AppHost once to create it:"
@@ -38,6 +39,24 @@ if (-not $pg) {
         exit 1
     }
 }
+
+# 1b. Aspire's WithHostPort(15432) only pins the DCP proxy, which isn't running in this
+#     standalone path — the container is published on a RANDOM host port that changes on
+#     recreation. Read the live port from docker and retarget the user-secret connection
+#     string (password stays in secrets) via an env override (outranks user-secrets).
+$pgPort = (docker port $pg 5432 | Select-Object -First 1).Split(':')[-1].Trim()
+if (-not $pgPort) {
+    Write-Warning "Could not read the Postgres published port from docker."
+    exit 1
+}
+$secretLine = dotnet user-secrets list --project $webProject 2>$null |
+    Where-Object { $_ -match '^ConnectionStrings:roamintdb\s*=' } | Select-Object -First 1
+if (-not $secretLine) {
+    Write-Warning "ConnectionStrings:roamintdb not found in Roamint.Web user-secrets (see docs/features/0014)."
+    exit 1
+}
+$env:ConnectionStrings__roamintdb = (($secretLine -split '=', 2)[1].Trim() -replace 'Port=\d+', "Port=$pgPort")
+Write-Host "Postgres: 127.0.0.1:$pgPort" -ForegroundColor DarkGray
 
 # 2. Show the LAN addresses the phone can use.
 Write-Host "`nReachable from the phone at:" -ForegroundColor Green

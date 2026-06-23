@@ -1,12 +1,15 @@
 @page "/receipts/new"
 @using System.Diagnostics.CodeAnalysis
+@using Microsoft.JSInterop
 @using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
 @using Roamint.Web.Receipts
+@implements IAsyncDisposable
 @inject IReceiptsApi ReceiptsApi
 @inject IExpensesQueries ExpensesQueries
 @inject ReceiptHandoff Handoff
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Scan receipt · Roamint</PageTitle>
 
@@ -20,19 +23,42 @@
 
     <div class="card">
         <h2>Scan a receipt</h2>
-        <p class="hint">Take a photo of the receipt. We read the items and prices, then you review and assign
-            categories before saving.</p>
-
-        <label class="receipt-pick @(busy ? "is-busy" : null)">
-            <i class="ti ti-camera ic" aria-hidden="true"></i>
-            <span>@(busy ? "Reading the receipt…" : "Take photo / choose image")</span>
-            <InputFile OnChange="OnFile" accept="image/*" capture="environment" disabled="@busy" />
-        </label>
+        <p class="hint">Photograph the receipt with the live camera, or choose an existing image. We read the
+            items and prices, then you review and assign categories before saving.</p>
 
         @if (busy)
         {
-            <p class="hint">This takes a few seconds while the text is extracted.</p>
+            <div class="processing">
+                <span class="spinner" aria-hidden="true"></span>
+                <p class="processing-label">Reading the receipt…</p>
+                <p class="hint">Extracting items and prices — just a few seconds.</p>
+            </div>
         }
+
+        <div class="viewfinder @(cameraOpen && !busy ? null : "is-hidden")">
+            <video @ref="video" playsinline muted autoplay></video>
+            <div class="viewfinder-actions">
+                <button type="button" class="ghost" @onclick="StopCamera">Cancel</button>
+                <button type="button" class="cap" @onclick="Capture">
+                    <i class="ti ti-camera ic" aria-hidden="true"></i> Capture
+                </button>
+            </div>
+        </div>
+
+        @if (!cameraOpen && !busy)
+        {
+            <button type="button" class="receipt-pick" @onclick="StartCamera">
+                <i class="ti ti-camera ic" aria-hidden="true"></i>
+                <span>Use camera</span>
+            </button>
+
+            <label class="receipt-pick file">
+                <i class="ti ti-photo ic" aria-hidden="true"></i>
+                <span>Choose photo</span>
+                <InputFile OnChange="OnFile" accept="image/*" />
+            </label>
+        }
+
         @if (error is not null)
         {
             <p class="error">@error</p>
@@ -43,29 +69,100 @@
 </div>
 
 @code {
-    // Receipts are small phone photos; cap generously to reject accidental huge files.
+    // The browser already caps the long edge (1600px JPEG, see receipt-camera.js), so the
+    // file-input backstop only needs to reject an accidentally huge original.
     private const long MaxBytes = 12L * 1024 * 1024;
 
+    private IJSObjectReference? module;
+    private ElementReference video;
+    private bool cameraOpen;
     private bool busy;
     private string? error;
+
+    private async Task<IJSObjectReference> ModuleAsync() =>
+        module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/receipt-camera.js");
+
+    private async Task StartCamera()
+    {
+        error = null;
+        cameraOpen = true; // render the <video> before wiring the stream to it.
+        StateHasChanged();
+
+        var ok = await (await ModuleAsync()).InvokeAsync<bool>("start", video);
+        if (!ok)
+        {
+            cameraOpen = false;
+            error = "Camera unavailable here — needs an HTTPS connection. Use “Choose photo” instead.";
+        }
+    }
+
+    private async Task StopCamera()
+    {
+        if (module is not null)
+        {
+            await module.InvokeVoidAsync("stop");
+        }
+        cameraOpen = false;
+    }
 
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Upload is a user action over IO + an external OCR call; any failure should surface as a "
-            + "friendly message on the page, not an unhandled circuit error.")]
+        Justification = "Capture spans JS interop (canvas/toBlob) + the upload; any failure should surface as a "
+            + "friendly on-page message rather than a silently-dropped circuit error.")]
+    private async Task Capture()
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = await (await ModuleAsync()).InvokeAsync<byte[]>("capture", video);
+        }
+        catch (Exception ex)
+        {
+            error = $"Couldn't capture the photo: {ex.Message}";
+            await StopCamera();
+            return;
+        }
+
+        // Switch to the processing state and render it BEFORE tearing down the stream, so the
+        // dead (black) viewfinder is never shown while the OCR call runs.
+        error = null;
+        cameraOpen = false;
+        busy = true;
+        StateHasChanged();
+
+        await StopCamera();
+        await Submit(bytes);
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Reading + downscaling a chosen file spans IO and JS interop; any failure should surface as "
+            + "a friendly on-page message rather than an unhandled circuit error.")]
     private async Task OnFile(InputFileChangeEventArgs e)
     {
-        error = null;
         var file = e.File;
         if (file is null)
         {
             return;
         }
 
+        if (file.Size > MaxBytes)
+        {
+            error = "That image is too large.";
+            return;
+        }
+
+        error = null;
         busy = true;
+        StateHasChanged();
+
+        byte[] resized;
         try
         {
+            // Read the original bytes, then downscale them in the browser through the same
+            // canvas pipeline as the live camera so the file path saves Gemini tokens too.
             using var buffer = new MemoryStream();
             await using (var stream = file.OpenReadStream(MaxBytes))
             {
@@ -73,7 +170,30 @@
             }
 
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
-            var result = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(buffer.ToArray(), contentType));
+            resized = await (await ModuleAsync()).InvokeAsync<byte[]>("resizeFile", buffer.ToArray(), contentType);
+        }
+        catch (Exception ex)
+        {
+            error = $"Couldn't read that image: {ex.Message}";
+            busy = false;
+            return;
+        }
+
+        await Submit(resized);
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Upload is a user action over IO + an external OCR call; any failure should surface as a "
+            + "friendly message on the page, not an unhandled circuit error.")]
+    private async Task Submit(byte[] image)
+    {
+        error = null;
+        busy = true;
+        try
+        {
+            var result = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(image, "image/jpeg"));
 
             // Resolve each line against the learned item vocabulary (0016): a match shows the remembered
             // canonical name + category + unit; a miss shows the first-time Farsi translation.
@@ -106,6 +226,22 @@
         {
             error = $"Couldn't read that image: {ex.Message}";
             busy = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try
+            {
+                await module.InvokeVoidAsync("stop");
+                await module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit already gone (page closed) — nothing to clean up.
+            }
         }
     }
 }
