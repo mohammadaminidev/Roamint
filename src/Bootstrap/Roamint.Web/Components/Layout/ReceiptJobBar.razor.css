@@ -1,0 +1,152 @@
+/* A persistent stack of receipt-processing rows, pinned just above the floating nav dock (0019). Fixed +
+   centered to the phone column so it survives navigation and floats over whatever page is mounted. */
+.job-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    z-index: 50;
+    width: 100%;
+    max-width: 430px;
+    box-sizing: border-box;
+    padding: 0 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.job {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 16px;
+    background: rgba(31, 36, 45, 0.92);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+    animation: job-rise 0.24s ease;
+}
+
+@keyframes job-rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.job-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.job-ic {
+    flex: 0 0 auto;
+    font-size: 1.3rem;
+    color: var(--accent);
+}
+
+.job-ic.warn {
+    color: #ffb454;
+}
+
+.job-text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.job-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.job-sub {
+    font-size: 0.76rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Spinner for the queued/reading/matching stages. */
+.job-spin {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-top-color: var(--accent);
+    animation: job-spin 0.7s linear infinite;
+}
+
+@keyframes job-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Honest indeterminate bar — a sliding sliver, never a fabricated percentage. */
+.job-track {
+    flex: 0 0 70px;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.job-track span {
+    display: block;
+    width: 40%;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+    animation: job-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes job-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(250%); }
+}
+
+.job-review {
+    flex: 0 0 auto;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.15s ease;
+}
+
+.job-review:active {
+    transform: scale(0.95);
+    filter: brightness(1.05);
+}
+
+.job-x {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.job-x:active {
+    background: rgba(255, 255, 255, 0.06);
+}

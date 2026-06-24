@@ -26,3 +26,7 @@ public sealed record DraftLineView(
 
 /// <summary>Fetches a receipt's current state for the review screen; null if the id is unknown.</summary>
 public sealed record GetReceipt(ReceiptId ReceiptId) : IQuery<ReceiptView?>;
+
+/// <summary>Ids of receipts still resting in <see cref="ReceiptStatus.Uploaded"/> — i.e. uploaded but not yet
+/// parsed (orphaned by a crash mid-parse). The host's startup sweep (0019) re-enqueues these.</summary>
+public sealed record ListPendingReceipts : IQuery<IReadOnlyList<Guid>>;

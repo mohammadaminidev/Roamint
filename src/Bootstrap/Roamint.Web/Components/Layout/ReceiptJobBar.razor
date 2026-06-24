@@ -1,0 +1,106 @@
+@using System.Globalization
+@using Roamint.Web.Capture
+@using Roamint.Web.Processing
+@implements IDisposable
+@inject ReceiptJobs Jobs
+@inject CaptureHandoff Handoff
+@inject NavigationManager Nav
+
+@{
+    var jobs = Jobs.Snapshot();
+}
+@if (jobs.Count > 0)
+{
+    <div class="job-bar">
+        @foreach (var job in jobs)
+        {
+            <div class="job @StageClass(job.Stage)">
+                @if (job.Stage == ReceiptJobStage.Ready)
+                {
+                    <div class="job-main">
+                        <i class="ti ti-receipt job-ic" aria-hidden="true"></i>
+                        <div class="job-text">
+                            <span class="job-title">@(string.IsNullOrWhiteSpace(job.Merchant) ? "Receipt ready" : job.Merchant)</span>
+                            <span class="job-sub">@FormatTotal(job) · @job.ItemCount item@(job.ItemCount == 1 ? "" : "s")</span>
+                        </div>
+                    </div>
+                    <button type="button" class="job-review" @onclick="() => Review(job)">Review</button>
+                    <button type="button" class="job-x" aria-label="Dismiss" @onclick="() => Jobs.Dismiss(job.ReceiptId)">×</button>
+                }
+                else if (job.Stage == ReceiptJobStage.Failed)
+                {
+                    <div class="job-main">
+                        <i class="ti ti-alert-triangle job-ic warn" aria-hidden="true"></i>
+                        <div class="job-text">
+                            <span class="job-title">Couldn't read receipt</span>
+                            <span class="job-sub">@job.Error</span>
+                        </div>
+                    </div>
+                    <button type="button" class="job-x" aria-label="Dismiss" @onclick="() => Jobs.Dismiss(job.ReceiptId)">×</button>
+                }
+                else
+                {
+                    <div class="job-main">
+                        <span class="job-spin" aria-hidden="true"></span>
+                        <div class="job-text">
+                            <span class="job-title">@StageLabel(job.Stage)</span>
+                        </div>
+                    </div>
+                    <div class="job-track" aria-hidden="true"><span></span></div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private Action? _onChanged;
+
+    protected override void OnInitialized()
+    {
+        // The worker raises Changed on a background thread; marshal the re-render onto this circuit.
+        _onChanged = () => InvokeAsync(StateHasChanged);
+        Jobs.Changed += _onChanged;
+    }
+
+    private void Review(ReceiptJob job)
+    {
+        if (job.Seed is null)
+        {
+            return;
+        }
+
+        Handoff.Set(job.Seed);
+        Jobs.Dismiss(job.ReceiptId);
+        Nav.NavigateTo("/add");
+    }
+
+    private static string StageClass(ReceiptJobStage stage) => stage switch
+    {
+        ReceiptJobStage.Ready => "is-ready",
+        ReceiptJobStage.Failed => "is-failed",
+        _ => "is-busy",
+    };
+
+    private static string StageLabel(ReceiptJobStage stage) => stage switch
+    {
+        ReceiptJobStage.Reading => "Reading items…",
+        ReceiptJobStage.Matching => "Matching items…",
+        _ => "Queued…",
+    };
+
+    private static string FormatTotal(ReceiptJob job)
+    {
+        var decimals = job.CurrencyCode == "AMD" ? 0 : 2;
+        var amount = job.Total.ToString($"F{decimals}", CultureInfo.InvariantCulture);
+        return string.IsNullOrWhiteSpace(job.CurrencyCode) ? amount : $"{amount} {job.CurrencyCode}";
+    }
+
+    public void Dispose()
+    {
+        if (_onChanged is not null)
+        {
+            Jobs.Changed -= _onChanged;
+        }
+    }
+}

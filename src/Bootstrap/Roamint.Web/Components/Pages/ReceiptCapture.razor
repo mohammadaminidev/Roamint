@@ -1,14 +1,11 @@
 @page "/receipts/new"
 @using System.Diagnostics.CodeAnalysis
 @using Microsoft.JSInterop
-@using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
-@using Roamint.Web.Capture
+@using Roamint.Web.Processing
 @implements IAsyncDisposable
 @inject IReceiptsApi ReceiptsApi
-@inject IExpensesQueries ExpensesQueries
-@inject CaptureHandoff Handoff
-@inject NavigationManager Nav
+@inject ReceiptJobs Jobs
 @inject IJSRuntime JS
 
 <PageTitle>Scan receipt · Roamint</PageTitle>
@@ -23,16 +20,20 @@
 
     <div class="card">
         <h2>Scan a receipt</h2>
-        <p class="hint">Photograph the receipt with the live camera, or choose an existing image. We read the
-            items and prices, then you review and assign categories before saving.</p>
+        <p class="hint">Photograph the receipt with the live camera, or choose an existing image. Reading happens
+            in the background — keep snapping, and review each one from the bar below when it's ready.</p>
 
         @if (busy)
         {
             <div class="processing">
                 <span class="spinner" aria-hidden="true"></span>
-                <p class="processing-label">Reading the receipt…</p>
-                <p class="hint">Extracting items and prices — just a few seconds.</p>
+                <p class="processing-label">Saving photo…</p>
             </div>
+        }
+
+        @if (justQueued && !busy)
+        {
+            <p class="success">Added to the queue — review it from the bar below when it's ready.</p>
         }
 
         <div class="viewfinder @(cameraOpen && !busy ? null : "is-hidden")">
@@ -77,6 +78,7 @@
     private ElementReference video;
     private bool cameraOpen;
     private bool busy;
+    private bool justQueued;
     private string? error;
 
     private async Task<IJSObjectReference> ModuleAsync() =>
@@ -85,6 +87,7 @@
     private async Task StartCamera()
     {
         error = null;
+        justQueued = false;
         cameraOpen = true; // render the <video> before wiring the stream to it.
         StateHasChanged();
 
@@ -127,6 +130,7 @@
         // Switch to the processing state and render it BEFORE tearing down the stream, so the
         // dead (black) viewfinder is never shown while the OCR call runs.
         error = null;
+        justQueued = false;
         cameraOpen = false;
         busy = true;
         StateHasChanged();
@@ -155,6 +159,7 @@
         }
 
         error = null;
+        justQueued = false;
         busy = true;
         StateHasChanged();
 
@@ -185,47 +190,25 @@
     [SuppressMessage(
         "Design",
         "CA1031:Do not catch general exception types",
-        Justification = "Upload is a user action over IO + an external OCR call; any failure should surface as a "
-            + "friendly message on the page, not an unhandled circuit error.")]
+        Justification = "Upload is a user action over IO; any failure should surface as a friendly message on "
+            + "the page, not an unhandled circuit error.")]
     private async Task Submit(byte[] image)
     {
         error = null;
         busy = true;
         try
         {
-            var result = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(image, "image/jpeg"));
+            // Fast path: store the image and hand the id to the background worker (0019). OCR + matching run
+            // off the circuit, surfaced in the job bar, so the user can immediately snap the next receipt.
+            var id = await ReceiptsApi.UploadAsync(new UploadReceiptRequest(image, "image/jpeg"));
+            await Jobs.EnqueueAsync(id);
 
-            // Resolve each line against the learned item vocabulary (0016): a match shows the remembered
-            // canonical name + category + unit; a miss shows the first-time Farsi translation.
-            var seedLines = new List<CaptureLineSeed>();
-            foreach (var line in result.Draft?.Lines ?? [])
-            {
-                Guid? categoryId = null;
-                string? unit = null;
-                var description = line.Description;
-
-                if (!string.IsNullOrWhiteSpace(line.SourceText))
-                {
-                    var match = await ExpensesQueries.MatchItemAsync(line.SourceText);
-                    if (match is not null)
-                    {
-                        description = match.CanonicalDescription;
-                        categoryId = match.CategoryId;
-                        unit = match.Unit;
-                    }
-                }
-
-                seedLines.Add(new CaptureLineSeed(line.SourceText, description, line.Amount, categoryId, unit));
-            }
-
-            // Hand the seeded lines to the add-expense form and go there to review + confirm.
-            Handoff.Set(new CaptureSeed(
-                CaptureSource.Receipt, result.ReceiptId, result.Draft?.CurrencyCode, result.Draft?.Date, seedLines));
-            Nav.NavigateTo("/add");
+            busy = false;
+            justQueued = true;
         }
         catch (Exception ex)
         {
-            error = $"Couldn't read that image: {ex.Message}";
+            error = $"Couldn't upload that photo: {ex.Message}";
             busy = false;
         }
     }

@@ -5,6 +5,7 @@ using Roamint.Wallet.Contracts;
 using Roamint.Web.Capture;
 using Roamint.Web.Components;
 using Roamint.Web.Import;
+using Roamint.Web.Processing;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,12 @@ builder.Services.AddScoped<SpreadsheetImporter>();
 // Carries a parsed capture (scanned receipt 0015, pasted order 0017) from its source page to /add within
 // the circuit.
 builder.Services.AddScoped<CaptureHandoff>();
+
+// Background receipt processing (0019): a shared job tracker, the serial OCR-then-match worker that drains it,
+// and a dev-only startup sweep that re-enqueues receipts orphaned mid-parse by a crash.
+builder.Services.AddSingleton<ReceiptJobs>();
+builder.Services.AddHostedService<ReceiptProcessingWorker>();
+builder.Services.AddHostedService<ReceiptStartupSweep>();
 
 var app = builder.Build();
 

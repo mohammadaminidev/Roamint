@@ -39,3 +39,20 @@ internal sealed class GetReceiptHandler(ReceiptsDbContext db)
             draft);
     }
 }
+
+/// <summary>Lists the ids of receipts still in <see cref="Roamint.Receipts.Domain.ReceiptStatus.Uploaded"/>
+/// for the host's startup re-enqueue sweep (0019).</summary>
+internal sealed class ListPendingReceiptsHandler(ReceiptsDbContext db)
+    : IQueryHandler<ListPendingReceipts, IReadOnlyList<Guid>>
+{
+    public async Task<IReadOnlyList<Guid>> HandleAsync(ListPendingReceipts query, CancellationToken ct)
+    {
+        var ids = await db.Receipts.AsNoTracking()
+            .Where(r => r.Status == Roamint.Receipts.Domain.ReceiptStatus.Uploaded)
+            .OrderBy(r => r.UploadedOnUtc)
+            .Select(r => r.Id.Value)
+            .ToListAsync(ct);
+
+        return ids;
+    }
+}

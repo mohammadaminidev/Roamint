@@ -14,4 +14,7 @@ internal sealed class ReceiptsQueries(IQueryDispatcher queries) : IReceiptsQueri
             ? null
             : new ReceiptDto(view.ReceiptId, view.Status, view.LinkedExpenseId, Mappings.ToDto(view.Draft));
     }
+
+    public Task<IReadOnlyList<Guid>> ListPendingAsync(CancellationToken ct = default) =>
+        queries.QueryAsync(new ListPendingReceipts(), ct);
 }

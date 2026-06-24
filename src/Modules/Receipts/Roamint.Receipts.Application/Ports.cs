@@ -54,11 +54,19 @@ public interface IUnitOfWork
     Task SaveChangesAsync(CancellationToken ct);
 }
 
-/// <summary>Stores receipt image bytes and returns an opaque key. Local gitignored filesystem in dev;
-/// object storage in prod (deferred).</summary>
+/// <summary>An image read back from the store: the bytes plus the content type recovered from the stored key's
+/// extension, so a re-read can be handed straight to OCR.</summary>
+public sealed record StoredImage(byte[] Bytes, string ContentType);
+
+/// <summary>Stores receipt image bytes and returns an opaque key, and reads them back by that key. Local
+/// gitignored filesystem in dev; object storage in prod (deferred). The read path (0019) lets the background
+/// parse worker re-open the image from the key rather than carrying bytes through the job queue.</summary>
 public interface IReceiptImageStore
 {
     Task<string> SaveAsync(byte[] image, string contentType, CancellationToken ct);
+
+    /// <summary>Opens a previously-stored image by its key; throws if the key is unknown.</summary>
+    Task<StoredImage> OpenAsync(string key, CancellationToken ct);
 }
 
 /// <summary>Extracts a <see cref="ParsedDraft"/> from a receipt image. The Anthropic vision adapter lives in

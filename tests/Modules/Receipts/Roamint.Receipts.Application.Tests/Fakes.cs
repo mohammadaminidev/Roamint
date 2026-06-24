@@ -21,12 +21,26 @@ internal sealed class InMemoryReceiptRepository : IReceiptRepository
 
 internal sealed class FakeImageStore : IReceiptImageStore
 {
+    private readonly Dictionary<string, StoredImage> _store = [];
+
     public int SaveCount { get; private set; }
+
+    public int OpenCount { get; private set; }
 
     public Task<string> SaveAsync(byte[] image, string contentType, CancellationToken ct)
     {
         SaveCount++;
-        return Task.FromResult($"receipts/{Guid.CreateVersion7():N}.bin");
+        var key = $"receipts/{Guid.CreateVersion7():N}.bin";
+        _store[key] = new StoredImage(image, contentType);
+        return Task.FromResult(key);
+    }
+
+    public Task<StoredImage> OpenAsync(string key, CancellationToken ct)
+    {
+        OpenCount++;
+        return _store.TryGetValue(key, out var image)
+            ? Task.FromResult(image)
+            : throw new FileNotFoundException($"No stored image for key '{key}'.");
     }
 }
 
