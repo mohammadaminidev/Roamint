@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <base href="/" />
+
+    <!-- PWA (doc 0020): installable shell + offline notice. -->
+    <meta name="theme-color" content="#0f1115" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Roamint" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png" />
+
     <link rel="stylesheet" href="lib/tabler-icons/tabler-icons.min.css" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["Roamint.Web.styles.css"]" />
@@ -11,6 +22,25 @@
 </head>
 <body>
     <Routes @rendermode="InteractiveServer" />
+
+    <!-- Custom Blazor reconnection UI: blazor.web.js toggles the components-reconnect-*
+         classes on this element as the SignalR circuit drops/recovers. On a phone a
+         dropped circuit is almost always lost connectivity, so we present it as such. -->
+    <div id="components-reconnect-modal" class="reconnect-overlay">
+        <div class="reconnect-card">
+            <div class="reconnect-icon">📡</div>
+            <h2>No internet connectivity</h2>
+            <p class="reconnect-detail reconnect-detail-retry">
+                Connection lost. Trying to reconnect…
+            </p>
+            <p class="reconnect-detail reconnect-detail-failed">
+                Couldn't reconnect. Check your network (or Tailscale) and retry.
+            </p>
+            <button class="reconnect-retry" onclick="location.reload()">Retry</button>
+        </div>
+    </div>
+
     <script src="_framework/blazor.web.js"></script>
+    <script src="js/pwa.js"></script>
 </body>
 </html>

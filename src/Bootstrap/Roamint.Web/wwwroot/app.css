@@ -52,3 +52,71 @@ body {
   justify-content: center;
   min-height: 100vh;
 }
+
+/* ── PWA offline / reconnection UI (doc 0020) ───────────────────────────────
+   blazor.web.js toggles components-reconnect-{show,hide,failed,rejected} on
+   #components-reconnect-modal as the SignalR circuit changes state. */
+#components-reconnect-modal {
+  display: none;
+}
+#components-reconnect-modal.components-reconnect-show,
+#components-reconnect-modal.components-reconnect-failed,
+#components-reconnect-modal.components-reconnect-rejected {
+  display: flex;
+}
+
+.reconnect-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 17, 21, 0.92);
+  backdrop-filter: blur(4px);
+}
+.reconnect-card {
+  max-width: 320px;
+  text-align: center;
+}
+.reconnect-icon { font-size: 48px; line-height: 1; margin-bottom: 16px; }
+.reconnect-card h2 { font-size: 20px; margin-bottom: 8px; }
+.reconnect-detail { color: var(--muted); font-size: 15px; line-height: 1.5; margin-bottom: 20px; }
+
+/* Pick the message per state; the Retry button only appears once retries are exhausted. */
+.reconnect-detail-failed,
+.reconnect-retry { display: none; }
+#components-reconnect-modal.components-reconnect-show .reconnect-detail-retry { display: block; }
+#components-reconnect-modal.components-reconnect-failed .reconnect-detail-retry,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-detail-retry { display: none; }
+#components-reconnect-modal.components-reconnect-failed .reconnect-detail-failed,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-detail-failed { display: block; }
+#components-reconnect-modal.components-reconnect-failed .reconnect-retry,
+#components-reconnect-modal.components-reconnect-rejected .reconnect-retry { display: inline-block; }
+.reconnect-retry {
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+/* Crude offline banner driven by navigator.onLine (pwa.js). */
+#offline-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: none;
+  padding: 10px 16px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--danger);
+}
+#offline-banner.offline-banner-show { display: block; }
