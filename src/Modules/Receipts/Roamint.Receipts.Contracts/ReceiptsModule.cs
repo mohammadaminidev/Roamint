@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Roamint.Application.Abstractions;
-using Roamint.Receipts.Application;
+using Roamint.Receipts.Application.Receipts;
 using Roamint.Receipts.Infrastructure;
 
 namespace Roamint.Receipts.Contracts;
@@ -23,6 +23,7 @@ public static class ReceiptsModule
 
         builder.Services.AddScoped<IReceiptsApi, ReceiptsApi>();
         builder.Services.AddScoped<IReceiptsQueries, ReceiptsQueries>();
+        builder.Services.AddScoped<IImportsApi, ImportsApi>();
 
         return builder;
     }

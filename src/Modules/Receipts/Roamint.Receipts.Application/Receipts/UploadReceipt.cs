@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Roamint.Application.Abstractions;
 using Roamint.Receipts.Domain;
 
-namespace Roamint.Receipts.Application;
+namespace Roamint.Receipts.Application.Receipts;
 
 /// <summary>
 /// Stores a receipt image, runs OCR synchronously, and lands the result as a <see cref="ParsedDraft"/> on a

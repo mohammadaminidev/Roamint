@@ -1,7 +1,7 @@
 using Roamint.Application.Abstractions;
 using Roamint.Receipts.Domain;
 
-namespace Roamint.Receipts.Application;
+namespace Roamint.Receipts.Application.Receipts;
 
 /// <summary>Links a parsed receipt to the expense the user recorded from it. The web host calls this after a
 /// successful RecordExpense; the link is an opaque expense id — no cross-schema FK.</summary>

@@ -4,12 +4,13 @@
 @using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
 @using Roamint.SharedKernel
-@using Roamint.Web.Receipts
+@using Roamint.Web.Capture
 @implements IDisposable
 @inject IExpensesApi Api
 @inject IExpensesQueries Queries
 @inject IReceiptsApi ReceiptsApi
-@inject ReceiptHandoff Handoff
+@inject IImportsApi ImportsApi
+@inject CaptureHandoff Handoff
 @inject TimeProvider Clock
 
 <PageTitle>Add expense · Roamint</PageTitle>
@@ -25,13 +26,9 @@
     <div class="card">
         <h2>New expense</h2>
 
-        @if (linkReceiptId is null)
+        @if (linkTarget is not null)
         {
-            <a class="scan-link" href="receipts/new"><i class="ti ti-camera" aria-hidden="true"></i> Scan a receipt instead</a>
-        }
-        else
-        {
-            <p class="hint">Reviewing a scanned receipt — check the items and pick a category for each.</p>
+            <p class="hint">@ReviewHint — check the items and pick a category for each.</p>
         }
 
         <div class="amount-row">
@@ -244,7 +241,13 @@
     private bool submitting;
     private string? error;
     private string? success;
-    private Guid? linkReceiptId;
+
+    // Set when reviewing a handed-off capture: which source to link back to on confirm, and its id.
+    private (CaptureSource Source, Guid Id)? linkTarget;
+
+    private string ReviewHint => linkTarget?.Source == CaptureSource.ImportedOrder
+        ? "Reviewing a pasted order"
+        : "Reviewing a scanned receipt";
 
     private string? activeSuggestKey;
     private IReadOnlyList<ItemSuggestion> suggestions = [];
@@ -262,8 +265,8 @@
         allTags = await Queries.ListTagsAsync();
         lines.Add(NewLine());
 
-        // If we arrived from a scanned receipt, seed the form from its draft and suggest categories.
-        if (ApplyReceiptHandoff())
+        // If we arrived from a scanned receipt or a pasted order, seed the form from its draft and suggest categories.
+        if (ApplyCaptureHandoff())
         {
             for (var i = 0; i < lines.Count; i++)
             {
@@ -272,10 +275,10 @@
         }
     }
 
-    // Seeds currency/date/lines from a handed-off receipt. Matched lines (resolved against the learned item
+    // Seeds currency/date/lines from a handed-off capture. Matched lines (resolved against the learned item
     // vocabulary, 0016) arrive with their canonical description + category + unit; unmatched lines carry the
-    // first-time Farsi translation and get a category suggestion below. Returns true if a receipt is reviewed.
-    private bool ApplyReceiptHandoff()
+    // first-time translation and get a category suggestion below. Returns true if a capture is reviewed.
+    private bool ApplyCaptureHandoff()
     {
         if (!Handoff.HasPending)
         {
@@ -284,7 +287,7 @@
 
         var seed = Handoff.Pending!;
         Handoff.Clear();
-        linkReceiptId = seed.ReceiptId;
+        linkTarget = (seed.Source, seed.SourceId);
 
         if (seed.CurrencyCode is { Length: > 0 } code && Currencies.Any(currency => currency.Code == code))
         {
@@ -652,13 +655,22 @@
             var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
             var expenseId = await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
 
-            // If this expense came from a scanned receipt, link the two (host orchestration — 0015) and learn
-            // each line's mapping so the next receipt resolves it automatically (0016).
-            if (linkReceiptId is Guid receiptId)
+            // If this expense came from a capture, link the source to the expense (host orchestration — 0015/
+            // 0017) and learn each line's mapping so the next capture resolves it automatically (0016).
+            if (linkTarget is (CaptureSource source, Guid sourceId))
             {
-                await ReceiptsApi.LinkAsync(receiptId, expenseId);
+                switch (source)
+                {
+                    case CaptureSource.Receipt:
+                        await ReceiptsApi.LinkAsync(sourceId, expenseId);
+                        break;
+                    case CaptureSource.ImportedOrder:
+                        await ImportsApi.LinkAsync(sourceId, expenseId);
+                        break;
+                }
+
                 await LearnItemMappingsAsync();
-                linkReceiptId = null;
+                linkTarget = null;
             }
 
             success = $"Recorded {TotalDisplay} {currencyCode}.";

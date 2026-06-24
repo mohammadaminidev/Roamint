@@ -33,6 +33,9 @@ See [`docs/features/`](docs/features) for per-slice design records (`0001`–`00
   to your vocabulary by embedding similarity (local `bge-m3` + pgvector); a confirmed rename
   is learned, so the next receipt resolves the item (name + unit + category) automatically.
   See `docs/features/0016`.
+- [x] Clipboard order import (Receipts module) — paste a Yerevan City order's JSON, a
+  source-agnostic parser registry maps it to the same review draft as OCR, reusing item
+  matching + learn-on-confirm. Dedup on `(source, external id)`. See `docs/features/0017`.
 - [ ] Natural-language queries over expenses (Insights module) — the feature that
   motivates the outbox drain.
 - [ ] Spreadsheet export (import landed dev-only in 0013).

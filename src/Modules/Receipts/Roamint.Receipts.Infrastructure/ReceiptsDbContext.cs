@@ -21,6 +21,8 @@ internal sealed class ReceiptsDbContext : DbContext
 
     public DbSet<Receipt> Receipts => Set<Receipt>();
 
+    public DbSet<ImportedOrder> ImportedOrders => Set<ImportedOrder>();
+
     internal DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -32,6 +34,7 @@ internal sealed class ReceiptsDbContext : DbContext
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<ReceiptId>().HaveConversion<ReceiptIdConverter>();
+        configurationBuilder.Properties<ImportedOrderId>().HaveConversion<ImportedOrderIdConverter>();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

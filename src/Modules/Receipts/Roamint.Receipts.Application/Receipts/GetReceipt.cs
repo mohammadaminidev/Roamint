@@ -1,7 +1,7 @@
 using Roamint.Application.Abstractions;
 using Roamint.Receipts.Domain;
 
-namespace Roamint.Receipts.Application;
+namespace Roamint.Receipts.Application.Receipts;
 
 /// <summary>The review-screen view of a receipt: its <see cref="ReceiptStatus"/> (canonical name) and the OCR
 /// draft, if any. Handled by a read model in Infrastructure.</summary>

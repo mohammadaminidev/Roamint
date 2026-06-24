@@ -3,11 +3,11 @@
 @using Microsoft.JSInterop
 @using Roamint.Expenses.Contracts
 @using Roamint.Receipts.Contracts
-@using Roamint.Web.Receipts
+@using Roamint.Web.Capture
 @implements IAsyncDisposable
 @inject IReceiptsApi ReceiptsApi
 @inject IExpensesQueries ExpensesQueries
-@inject ReceiptHandoff Handoff
+@inject CaptureHandoff Handoff
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -197,7 +197,7 @@
 
             // Resolve each line against the learned item vocabulary (0016): a match shows the remembered
             // canonical name + category + unit; a miss shows the first-time Farsi translation.
-            var seedLines = new List<ReceiptLineSeed>();
+            var seedLines = new List<CaptureLineSeed>();
             foreach (var line in result.Draft?.Lines ?? [])
             {
                 Guid? categoryId = null;
@@ -215,11 +215,12 @@
                     }
                 }
 
-                seedLines.Add(new ReceiptLineSeed(line.SourceText, description, line.Amount, categoryId, unit));
+                seedLines.Add(new CaptureLineSeed(line.SourceText, description, line.Amount, categoryId, unit));
             }
 
             // Hand the seeded lines to the add-expense form and go there to review + confirm.
-            Handoff.Set(new ReceiptSeed(result.ReceiptId, result.Draft?.CurrencyCode, result.Draft?.Date, seedLines));
+            Handoff.Set(new CaptureSeed(
+                CaptureSource.Receipt, result.ReceiptId, result.Draft?.CurrencyCode, result.Draft?.Date, seedLines));
             Nav.NavigateTo("/add");
         }
         catch (Exception ex)

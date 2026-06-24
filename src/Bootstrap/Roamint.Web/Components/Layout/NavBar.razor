@@ -1,4 +1,39 @@
-@* Bottom navigation shared across the mobile screens. *@
+@* Bottom navigation shared across the mobile screens. The centre + opens a capture-method sheet. *@
+@inject NavigationManager Nav
+
+@* Sheet + scrim stay mounted and animate via a toggled class, so they slide both in and out. *@
+<div class="sheet-scrim @(sheetOpen ? "is-open" : null)" @onclick="CloseSheet" aria-hidden="@(!sheetOpen)"></div>
+<div class="capture-sheet @(sheetOpen ? "is-open" : null)" role="dialog" aria-label="Add an expense"
+     aria-hidden="@(!sheetOpen)">
+    <div class="sheet-grip" aria-hidden="true"></div>
+
+    <button type="button" class="sheet-opt" tabindex="@SheetTabIndex" @onclick='() => Go("receipts/new")'>
+        <span class="opt-ic"><i class="ti ti-camera" aria-hidden="true"></i></span>
+        <span class="opt-text">
+            <span class="opt-title">Scan receipt</span>
+            <span class="opt-sub">Snap a photo, we read it</span>
+        </span>
+        <i class="ti ti-chevron-right opt-chev" aria-hidden="true"></i>
+    </button>
+
+    <button type="button" class="sheet-opt" tabindex="@SheetTabIndex" @onclick='() => Go("orders/new")'>
+        <span class="opt-ic"><i class="ti ti-clipboard-text" aria-hidden="true"></i></span>
+        <span class="opt-text">
+            <span class="opt-title">Paste an order</span>
+            <span class="opt-sub">Import Yerevan City JSON</span>
+        </span>
+        <i class="ti ti-chevron-right opt-chev" aria-hidden="true"></i>
+    </button>
+
+    <button type="button" class="sheet-opt" tabindex="@SheetTabIndex" @onclick='() => Go("add")'>
+        <span class="opt-ic muted"><i class="ti ti-pencil" aria-hidden="true"></i></span>
+        <span class="opt-text">
+            <span class="opt-title">Enter manually</span>
+            <span class="opt-sub">Type the expense yourself</span>
+        </span>
+        <i class="ti ti-chevron-right opt-chev" aria-hidden="true"></i>
+    </button>
+</div>
 
 <div class="nav-dock">
     <nav class="nav">
@@ -11,9 +46,10 @@
             <i class="ti ti-notes ic" aria-hidden="true"></i>
             <span class="label">Expenses</span>
         </NavLink>
-        <NavLink class="nav-item fab-wrap" href="add">
-            <i class="ti ti-plus fab" aria-hidden="true"></i>
-        </NavLink>
+        <button type="button" class="nav-item fab-wrap" @onclick="ToggleSheet"
+                aria-label="Add an expense" aria-expanded="@sheetOpen">
+            <span class="fab @(sheetOpen ? "is-open" : null)"><i class="ti ti-plus" aria-hidden="true"></i></span>
+        </button>
         <NavLink class="nav-item" href="rates">
             <i class="ti ti-arrows-exchange ic" aria-hidden="true"></i>
             <span class="label">Rates</span>
@@ -24,3 +60,20 @@
         </NavLink>
     </nav>
 </div>
+
+@code {
+    private bool sheetOpen;
+
+    // The sheet stays in the DOM (so it can animate closed); keep its buttons out of the tab order while hidden.
+    private string? SheetTabIndex => sheetOpen ? null : "-1";
+
+    private void ToggleSheet() => sheetOpen = !sheetOpen;
+
+    private void CloseSheet() => sheetOpen = false;
+
+    private void Go(string path)
+    {
+        sheetOpen = false;
+        Nav.NavigateTo("/" + path);
+    }
+}

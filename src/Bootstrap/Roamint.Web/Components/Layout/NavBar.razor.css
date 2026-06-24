@@ -83,16 +83,18 @@
     box-shadow: 0 0 8px var(--accent);
 }
 
-.nav ::deep .fab-wrap {
+/* The FAB is a real <button> in this component's scope (it toggles the sheet), so it is
+   styled directly — no ::deep, which only reaches the NavLink-rendered <a> tabs. */
+.fab-wrap {
     padding: 0;
     background: none;
+    border: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
 }
 
-.nav ::deep .fab-wrap.active::after {
-    display: none;
-}
-
-.nav ::deep .fab {
+.fab {
     width: 52px;
     height: 52px;
     border-radius: 18px;
@@ -100,21 +102,135 @@
     place-items: center;
     color: #fff;
     font-size: 1.6rem;
-    font-weight: 400;
     line-height: 1;
     background: linear-gradient(145deg, #7aa0ff, var(--accent));
     box-shadow:
         0 0 0 4px rgba(91, 140, 255, 0.12),
         0 8px 20px rgba(91, 140, 255, 0.5);
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    transition: transform 0.2s ease, box-shadow 0.18s ease;
 }
 
-.nav ::deep .fab-wrap:active .fab {
-    transform: scale(0.92) rotate(90deg);
+.fab-wrap:active .fab {
+    transform: scale(0.92);
 }
 
-.nav ::deep .fab-wrap.active .fab {
+/* Open state: spin the + into a × to signal the sheet can be dismissed by tapping again. */
+.fab.is-open {
+    transform: rotate(45deg);
     box-shadow:
         0 0 0 5px rgba(91, 140, 255, 0.18),
         0 10px 24px rgba(91, 140, 255, 0.6);
+}
+
+/* ---- Capture-method sheet ---- */
+
+.sheet-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 54;
+    background: rgba(8, 10, 14, 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sheet-scrim.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* A real bottom sheet: anchored to the bottom edge, full phone width, rounded top only. It rises over the
+   nav island (which is dimmed by the scrim) and slides back down on close. */
+.capture-sheet {
+    position: fixed;
+    left: 50%;
+    bottom: 0;
+    z-index: 55;
+    width: 100%;
+    max-width: 430px;
+    box-sizing: border-box;
+    padding: 10px 14px calc(22px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 26px 26px 0 0;
+    background: #1b202a;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
+    transform: translate(-50%, 100%);
+    transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.capture-sheet.is-open {
+    transform: translate(-50%, 0);
+}
+
+.sheet-grip {
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    margin: 2px auto 6px;
+}
+
+.sheet-opt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 12px;
+    border: none;
+    border-radius: 15px;
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease;
+}
+
+.sheet-opt:active {
+    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.opt-ic {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 1.3rem;
+}
+
+.opt-ic.muted {
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.opt-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.opt-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.opt-sub {
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.opt-chev {
+    color: #5f6b7d;
+    font-size: 1.1rem;
 }

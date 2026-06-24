@@ -23,6 +23,52 @@ namespace Roamint.Receipts.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Roamint.Receipts.Domain.ImportedOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Draft")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("draft");
+
+                    b.Property<string>("ExternalOrderId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("external_order_id");
+
+                    b.Property<DateTimeOffset>("ImportedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("imported_on_utc");
+
+                    b.Property<Guid?>("LinkedExpenseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_expense_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "ExternalOrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_imported_orders_source_external_id");
+
+                    b.ToTable("imported_orders", "receipts");
+                });
+
             modelBuilder.Entity("Roamint.Receipts.Domain.Receipt", b =>
                 {
                     b.Property<Guid>("Id")

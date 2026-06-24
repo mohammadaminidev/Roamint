@@ -1,5 +1,5 @@
 using Roamint.Application.Abstractions;
-using Roamint.Receipts.Application;
+using Roamint.Receipts.Application.Receipts;
 using Roamint.Receipts.Domain;
 
 namespace Roamint.Receipts.Contracts;

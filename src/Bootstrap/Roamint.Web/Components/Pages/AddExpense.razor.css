@@ -194,16 +194,6 @@ header {
     font-size: 0.74rem;
 }
 
-.scan-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--accent);
-    text-decoration: none;
-    margin-bottom: 12px;
-}
 
 .scan-link i {
     font-size: 1rem;

@@ -15,6 +15,8 @@ internal static class OutboxEventTypes
         [typeof(ReceiptParsed)] = "receipts.receipt-parsed",
         [typeof(ReceiptParseFailed)] = "receipts.receipt-parse-failed",
         [typeof(ReceiptLinked)] = "receipts.receipt-linked",
+        [typeof(OrderImported)] = "receipts.order-imported",
+        [typeof(ImportedOrderLinked)] = "receipts.imported-order-linked",
     };
 
     public static string DiscriminatorFor(IDomainEvent domainEvent)

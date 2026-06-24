@@ -27,7 +27,12 @@ public static class ReceiptsPersistence
         builder.AddNpgsqlDbContext<ReceiptsDbContext>("roamintdb");
 
         builder.Services.AddScoped<IReceiptRepository, ReceiptRepository>();
+        builder.Services.AddScoped<IImportedOrderRepository, ImportedOrderRepository>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Order-import parsers (0017): one per known shop JSON shape. The import handler holds the full set and
+        // tries each in turn. Stateless and pure, so singletons.
+        builder.Services.AddSingleton<IOrderImportParser, Parsers.YerevanCityOrderParser>();
 
         var imageRoot = builder.Configuration["Receipts:ImageRoot"]
             ?? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "receipts");

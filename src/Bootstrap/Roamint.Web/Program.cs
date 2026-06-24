@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Roamint.Expenses.Contracts;
 using Roamint.Receipts.Contracts;
 using Roamint.Wallet.Contracts;
+using Roamint.Web.Capture;
 using Roamint.Web.Components;
 using Roamint.Web.Import;
-using Roamint.Web.Receipts;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,8 +27,9 @@ builder.Services.AddRazorComponents()
 // Dev-only spreadsheet import tooling (0013); the /import page guards on the environment.
 builder.Services.AddScoped<SpreadsheetImporter>();
 
-// Carries an OCR'd receipt draft from /receipts/new to /add within the circuit (0015).
-builder.Services.AddScoped<ReceiptHandoff>();
+// Carries a parsed capture (scanned receipt 0015, pasted order 0017) from its source page to /add within
+// the circuit.
+builder.Services.AddScoped<CaptureHandoff>();
 
 var app = builder.Build();
 

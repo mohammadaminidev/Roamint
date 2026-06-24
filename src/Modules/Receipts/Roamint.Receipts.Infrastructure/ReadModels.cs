@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Roamint.Application.Abstractions;
-using Roamint.Receipts.Application;
+using Roamint.Receipts.Application.Receipts;
 
 namespace Roamint.Receipts.Infrastructure;
 

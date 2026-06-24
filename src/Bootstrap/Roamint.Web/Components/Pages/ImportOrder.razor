@@ -1,0 +1,129 @@
+@page "/orders/new"
+@using System.Diagnostics.CodeAnalysis
+@using Roamint.Expenses.Contracts
+@using Roamint.Receipts.Contracts
+@using Roamint.SharedKernel
+@using Roamint.Web.Capture
+@inject IImportsApi ImportsApi
+@inject IExpensesQueries ExpensesQueries
+@inject CaptureHandoff Handoff
+@inject NavigationManager Nav
+
+<PageTitle>Paste an order · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Roamint
+            <small>Yerevan</small>
+        </div>
+    </header>
+
+    <div class="card">
+        <h2>Paste an order</h2>
+        <p class="hint">Copy the order's JSON from the shop (e.g. Yerevan City) and paste it below. We read the
+            items and prices, then you review and assign categories before saving.</p>
+
+        <div class="field">
+            <textarea class="order-json" placeholder="Paste order JSON here…" rows="8"
+                      value="@rawJson" @oninput="OnInput" disabled="@busy"></textarea>
+        </div>
+
+        <button type="button" class="action" disabled="@(busy || string.IsNullOrWhiteSpace(rawJson))" @onclick="Import">
+            @(busy ? "Reading…" : "Import order")
+        </button>
+
+        @if (warning is not null)
+        {
+            <p class="warn">@warning</p>
+        }
+        @if (error is not null)
+        {
+            <p class="error">@error</p>
+        }
+    </div>
+
+    <NavBar />
+</div>
+
+@code {
+    private string rawJson = string.Empty;
+    private bool busy;
+    private string? error;
+    private string? warning;
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        rawJson = e.Value?.ToString() ?? string.Empty;
+        error = null;
+        warning = null;
+    }
+
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Import spans JSON parsing + a cross-module match; any unexpected failure should surface "
+            + "as a friendly on-page message rather than an unhandled circuit error.")]
+    private async Task Import()
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        warning = null;
+        try
+        {
+            var result = await ImportsApi.ImportAsync(new ImportOrderRequest(rawJson));
+
+            if (result.AlreadyImported)
+            {
+                warning = result.ExistingExpenseId is not null
+                    ? "This order was already imported and recorded as an expense."
+                    : "This order was already imported — it's waiting to be reviewed.";
+                busy = false;
+                return;
+            }
+
+            // Resolve each line against the learned item vocabulary (0016): a match shows the remembered
+            // canonical name + category + unit; a miss shows the first-time name from the order.
+            var seedLines = new List<CaptureLineSeed>();
+            foreach (var line in result.Draft.Lines)
+            {
+                Guid? categoryId = null;
+                string? unit = null;
+                var description = line.Description;
+
+                if (!string.IsNullOrWhiteSpace(line.SourceText))
+                {
+                    var match = await ExpensesQueries.MatchItemAsync(line.SourceText);
+                    if (match is not null)
+                    {
+                        description = match.CanonicalDescription;
+                        categoryId = match.CategoryId;
+                        unit = match.Unit;
+                    }
+                }
+
+                seedLines.Add(new CaptureLineSeed(line.SourceText, description, line.Amount, categoryId, unit));
+            }
+
+            Handoff.Set(new CaptureSeed(
+                CaptureSource.ImportedOrder, result.ImportId, result.Draft.CurrencyCode, result.Draft.Date, seedLines));
+            Nav.NavigateTo("/add");
+        }
+        catch (DomainException ex)
+        {
+            // Unrecognized source, totals mismatch, etc. — a friendly, expected failure.
+            error = ex.Message;
+            busy = false;
+        }
+        catch (Exception ex)
+        {
+            error = $"Couldn't import that order: {ex.Message}";
+            busy = false;
+        }
+    }
+}

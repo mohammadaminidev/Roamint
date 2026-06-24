@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using Roamint.Receipts.Application;
+using Roamint.Receipts.Application.Receipts;
 using Roamint.Receipts.Domain;
 
 namespace Roamint.Receipts.Application.Tests;

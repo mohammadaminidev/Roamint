@@ -17,6 +17,22 @@ internal sealed class ReceiptRepository(ReceiptsDbContext db) : IReceiptReposito
     }
 }
 
+internal sealed class ImportedOrderRepository(ReceiptsDbContext db) : IImportedOrderRepository
+{
+    public Task<ImportedOrder?> GetAsync(ImportedOrderId id, CancellationToken ct) =>
+        db.ImportedOrders.FirstOrDefaultAsync(order => order.Id == id, ct);
+
+    public Task<ImportedOrder?> FindAsync(string source, string externalOrderId, CancellationToken ct) =>
+        db.ImportedOrders.FirstOrDefaultAsync(
+            order => order.Source == source && order.ExternalOrderId == externalOrderId, ct);
+
+    public Task AddAsync(ImportedOrder order, CancellationToken ct)
+    {
+        db.ImportedOrders.Add(order);
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class UnitOfWork(ReceiptsDbContext db) : IUnitOfWork
 {
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
