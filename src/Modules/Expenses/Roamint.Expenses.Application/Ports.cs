@@ -34,8 +34,8 @@ public interface IExpenseRepository
 }
 
 /// <summary>Write-side access to learned <see cref="ItemMapping"/>s. The embedding is supplied alongside the
-/// aggregate — it is an Infrastructure concern (the domain holds no vector). Upsert is by normalised source
-/// text; recognition for reads is by embedding (see <c>MatchItem</c>), not this exact key.</summary>
+/// aggregate — it is an Infrastructure concern (the domain holds no vector) and is now kept only for Insights.
+/// Upsert is by normalised source text, which is also the exact key reads recognise by (see <c>MatchItem</c>).</summary>
 public interface IItemMappingRepository
 {
     Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct);
@@ -46,8 +46,9 @@ public interface IItemMappingRepository
     Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct);
 }
 
-/// <summary>Produces an embedding vector for item text (local bge-m3 by default; see 0016). The matching and
-/// learning handlers depend only on this; the model and endpoint are an Infrastructure concern.</summary>
+/// <summary>Produces an embedding vector for item text (local bge-m3 by default; see 0016). Only the learning
+/// handler (<c>RecordItemMapping</c>) depends on this now — matching is exact (0021); the vector is kept for
+/// Insights. The model and endpoint are an Infrastructure concern.</summary>
 public interface IItemEmbedder
 {
     Task<float[]> EmbedAsync(string text, CancellationToken ct);

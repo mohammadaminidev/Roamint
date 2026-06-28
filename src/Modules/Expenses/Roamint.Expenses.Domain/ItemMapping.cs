@@ -6,7 +6,8 @@ namespace Roamint.Expenses.Domain;
 /// A learned resolution of external item text (e.g. an Armenian receipt line) to a canonical expense item —
 /// the user's final Farsi description, its quantity unit, and its category. Written when the user confirms a
 /// receipt-sourced expense; a later confirmation of the same source wins. Recognition for reads is by
-/// embedding similarity (see 0016) — the vector is an Infrastructure concern and is deliberately absent here.
+/// <b>exact</b> match on the normalised source text (0021); the embedding is still written (Infrastructure
+/// concern, deliberately absent here) but kept dormant for Insights, no longer used to match.
 /// </summary>
 public sealed class ItemMapping : AggregateRoot<ItemMappingId>
 {
@@ -16,8 +17,8 @@ public sealed class ItemMapping : AggregateRoot<ItemMappingId>
     // EF / serialization constructor; not for domain use.
     private ItemMapping(ItemMappingId id) : base(id) { }
 
-    /// <summary>The external source text, normalised. The write-side dedup key; reads recognise by embedding,
-    /// not this exact string.</summary>
+    /// <summary>The external source text, normalised. The write-side dedup key <i>and</i> the read-side exact
+    /// match key (0021).</summary>
     public string SourceText { get; private set; } = string.Empty;
 
     /// <summary>The user's final canonical description (Farsi).</summary>
@@ -53,13 +54,15 @@ public sealed class ItemMapping : AggregateRoot<ItemMappingId>
         Apply(canonicalDescription, unit, categoryId, clock);
     }
 
-    /// <summary>Trim and collapse internal whitespace. Shared by the write-side dedup key and the text handed
-    /// to the embedder, so the two never diverge.</summary>
+    /// <summary>Trim, collapse internal whitespace, and lowercase. This is the <b>exact match key</b> (0021):
+    /// shared by the write-side dedup key and the read-side recognition lookup, so the two never diverge and
+    /// case/spacing noise between scans doesn't split the same item.</summary>
     public static string Normalize(string sourceText)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceText);
 
-        var collapsed = string.Join(' ', sourceText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var collapsed = string.Join(' ', sourceText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            .ToLowerInvariant();
         if (collapsed.Length > MaxSourceLength)
         {
             throw new DomainException($"Item source text must be {MaxSourceLength} characters or fewer.");

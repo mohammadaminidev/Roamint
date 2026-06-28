@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
-using Roamint.Expenses.Application;
 using Roamint.Expenses.Application.Queries;
 using Roamint.Expenses.Domain;
 using Roamint.Expenses.Infrastructure;
@@ -13,16 +12,11 @@ public sealed class ItemMappingPersistenceTests(PostgresFixture fixture)
     private const int Dim = 1024;
     private static readonly DateTimeOffset Now = new(2026, 6, 20, 10, 0, 0, TimeSpan.Zero);
 
-    // A near-one-hot vector — orthogonal axes are cosine-distance 1.0 apart, giving deterministic NN tests.
-    private static float[] Axis(int index, float primary = 1f, int? secondIndex = null, float secondary = 0f)
+    // The embedding is dormant now (kept for Insights) but still a NOT-NULL write input; any vector will do.
+    private static float[] Axis(int index)
     {
         var vector = new float[Dim];
-        vector[index] = primary;
-        if (secondIndex is int j)
-        {
-            vector[j] = secondary;
-        }
-
+        vector[index] = 1f;
         return vector;
     }
 
@@ -44,7 +38,8 @@ public sealed class ItemMappingPersistenceTests(PostgresFixture fixture)
 
         await using (var db = fixture.CreateContext(clock))
         {
-            var found = await new ItemMappingRepository(db).FindBySourceTextAsync(source, ct);
+            // The repo keys on the normalised text — the same transform the write side stored.
+            var found = await new ItemMappingRepository(db).FindBySourceTextAsync(ItemMapping.Normalize(source), ct);
 
             found.ShouldNotBeNull();
             found!.CanonicalDescription.ShouldBe("پنیر چاناخ");
@@ -54,7 +49,7 @@ public sealed class ItemMappingPersistenceTests(PostgresFixture fixture)
     }
 
     [Fact]
-    public async Task MatchItem_returns_nearest_within_threshold_and_null_beyond_it()
+    public async Task MatchItem_returns_the_exact_mapping_and_null_for_unseen_text()
     {
         var clock = new FakeTimeProvider(Now);
         var ct = TestContext.Current.CancellationToken;
@@ -63,37 +58,37 @@ public sealed class ItemMappingPersistenceTests(PostgresFixture fixture)
 
         await using var db = fixture.CreateContext(clock);
 
-        // Isolate: the NN search scans the whole table, so start from empty (collection runs sequentially).
+        // Isolate: the lookup scans the whole table, so start from empty (collection runs sequentially).
         await db.ItemMappings.ExecuteDeleteAsync(ct);
+
+        var cheeseSource = $"Պանիր {Guid.CreateVersion7():N}";
+        var limeSource = $"Կիտրոն {Guid.CreateVersion7():N}";
 
         var repo = new ItemMappingRepository(db);
         await repo.AddAsync(
-            ItemMapping.Create(ItemMappingId.New(clock), $"cheese-{Guid.CreateVersion7():N}", "پنیر", "g", cheeseCat, clock),
-            Axis(0), ct);
+            ItemMapping.Create(ItemMappingId.New(clock), cheeseSource, "پنیر", "g", cheeseCat, clock), Axis(0), ct);
         await repo.AddAsync(
-            ItemMapping.Create(ItemMappingId.New(clock), $"lime-{Guid.CreateVersion7():N}", "لیمو", null, limeCat, clock),
-            Axis(1), ct);
+            ItemMapping.Create(ItemMappingId.New(clock), limeSource, "لیمو", null, limeCat, clock), Axis(1), ct);
         await db.SaveChangesAsync(ct);
 
-        var embedder = new MapEmbedder(new Dictionary<string, float[]>
-        {
-            ["near cheese"] = Axis(0, 0.98f, secondIndex: 1, secondary: 0.02f), // ~cheese
-            ["unrelated"] = Axis(2), // orthogonal to both → distance 1.0
-        });
-        var handler = new MatchItemHandler(db, embedder);
+        var handler = new MatchItemHandler(db);
 
-        var hit = await handler.HandleAsync(new MatchItem("near cheese"), ct);
-        hit.ShouldNotBeNull();
-        hit!.CanonicalDescription.ShouldBe("پنیر");
-        hit.Unit.ShouldBe("g");
-        hit.CategoryId.ShouldBe(cheeseCat);
+        // Exact text resolves to its own mapping — never a different one (the bug 0021 fixes).
+        var lime = await handler.HandleAsync(new MatchItem(limeSource), ct);
+        lime.ShouldNotBeNull();
+        lime!.CanonicalDescription.ShouldBe("لیمو");
+        lime.Unit.ShouldBeNull();
+        lime.CategoryId.ShouldBe(limeCat);
 
-        var miss = await handler.HandleAsync(new MatchItem("unrelated"), ct);
+        // Case / surrounding-whitespace noise still hits via the shared normalisation.
+        var noisy = await handler.HandleAsync(new MatchItem($"  {cheeseSource.ToUpperInvariant()}  "), ct);
+        noisy.ShouldNotBeNull();
+        noisy!.CanonicalDescription.ShouldBe("پنیر");
+        noisy.Unit.ShouldBe("g");
+        noisy.CategoryId.ShouldBe(cheeseCat);
+
+        // Never-seen text is a miss, not a nearest-neighbour guess.
+        var miss = await handler.HandleAsync(new MatchItem($"Միս {Guid.CreateVersion7():N}"), ct);
         miss.ShouldBeNull();
-    }
-
-    private sealed class MapEmbedder(Dictionary<string, float[]> map) : IItemEmbedder
-    {
-        public Task<float[]> EmbedAsync(string text, CancellationToken ct) => Task.FromResult(map[text]);
     }
 }

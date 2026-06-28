@@ -28,13 +28,14 @@ public sealed class RecordItemMappingTests
         await handler.HandleAsync(
             new RecordItemMapping("  Պանիր Չանախ ", "پنیر چاناخ", "g", cat), TestContext.Current.CancellationToken);
 
+        // Normalisation trims, collapses whitespace, and lowercases (the exact match key, 0021).
         var mapping = mappings.All.ShouldHaveSingleItem();
-        mapping.SourceText.ShouldBe("Պանիր Չանախ");
+        mapping.SourceText.ShouldBe("պանիր չանախ");
         mapping.CanonicalDescription.ShouldBe("پنیر چاناخ");
         mapping.Unit.ShouldBe("g");
         mapping.CategoryId.ShouldBe(cat);
         mappings.Embeddings.ShouldContainKey(mapping.Id);
-        embedder.Embedded.ShouldHaveSingleItem().ShouldBe("Պանիր Չանախ");
+        embedder.Embedded.ShouldHaveSingleItem().ShouldBe("պանիր չանախ");
         uow.SaveCount.ShouldBe(1);
     }
 
