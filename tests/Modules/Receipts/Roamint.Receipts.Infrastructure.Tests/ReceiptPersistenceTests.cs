@@ -52,6 +52,37 @@ public sealed class ReceiptPersistenceTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task Reads_committed_status_even_when_the_context_tracks_a_stale_copy()
+    {
+        // Reproduces the 0019 regression: the upload-step context tracks the receipt at Uploaded while the
+        // background worker advances it to Parsed in its own context. The shared circuit-scoped context must
+        // serve the committed status to the link step, not the stale tracked copy.
+        var clock = new FakeTimeProvider(Now);
+        var id = ReceiptId.New(clock);
+
+        await using var circuit = fixture.CreateContext(clock);
+        var circuitRepo = new ReceiptRepository(circuit);
+
+        // Upload on the "circuit" context — leaves the entity tracked at Uploaded.
+        await circuitRepo.AddAsync(Receipt.Upload(id, "receipts/stale.jpg", clock), TestContext.Current.CancellationToken);
+        await circuit.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // Background worker parses it in a separate context — DB row is now Parsed.
+        await using (var worker = fixture.CreateContext(clock))
+        {
+            var parsing = await new ReceiptRepository(worker).GetAsync(id, TestContext.Current.CancellationToken);
+            parsing!.Parse(ParsedDraft.Empty, clock);
+            await worker.SaveChangesAsync(TestContext.Current.CancellationToken);
+        }
+
+        // Link step on the original circuit context: must see Parsed and link cleanly.
+        var linking = await circuitRepo.GetAsync(id, TestContext.Current.CancellationToken);
+        linking!.Status.ShouldBe(ReceiptStatus.Parsed);
+
+        Should.NotThrow(() => linking.LinkTo(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task Captures_one_outbox_row_per_event_and_clears_the_buffer()
     {
         var clock = new FakeTimeProvider(Now);
