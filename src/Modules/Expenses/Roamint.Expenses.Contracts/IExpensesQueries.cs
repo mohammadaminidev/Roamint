@@ -51,6 +51,14 @@ public interface IExpensesQueries
     /// </summary>
     Task<IReadOnlyList<CategorySpendItem>> GetMonthlySummaryAsync(
         DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Counts existing expenses on <paramref name="occurredOn"/> in <paramref name="currencyCode"/> whose total
+    /// equals <paramref name="total"/> — the duplicate-twin signal used by the add-expense confirmation guard
+    /// (0022). Equal-total same-day expenses are legal; a non-zero count just drives a "save anyway?" prompt.
+    /// </summary>
+    Task<int> CountSameDayMatchesAsync(
+        DateOnly occurredOn, string currencyCode, decimal total, CancellationToken ct = default);
 }
 
 public sealed record CategoryListItem(Guid Id, string Name);

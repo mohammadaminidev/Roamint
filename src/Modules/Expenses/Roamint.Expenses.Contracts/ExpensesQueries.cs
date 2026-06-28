@@ -68,4 +68,8 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
                 bucket.CategoryId, bucket.CategoryName, bucket.CurrencyCode, bucket.Total))
             .ToList();
     }
+
+    public Task<int> CountSameDayMatchesAsync(
+        DateOnly occurredOn, string currencyCode, decimal total, CancellationToken ct = default) =>
+        queries.QueryAsync(new CountSameDayMatches(occurredOn, currencyCode, total), ct);
 }

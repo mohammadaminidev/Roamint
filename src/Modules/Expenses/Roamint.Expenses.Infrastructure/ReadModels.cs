@@ -314,6 +314,33 @@ internal sealed class GetMonthlySummaryHandler(ExpensesDbContext db)
 }
 
 /// <summary>
+/// Counts same-day twins for the duplicate guard (0022): expenses on the queried date whose currency matches
+/// and whose line-derived total equals the target. Currency and Total are <c>Ignore</c>d on the aggregate
+/// (derived from lines), so this aggregates over <c>expense_lines</c> like the monthly summary — filter the
+/// day's expenses to the currency (single-currency invariant ⇒ <c>All</c>), sum each expense's line amounts
+/// in SQL, then count the per-expense totals equal to the target. EF read, personal scale.
+/// </summary>
+internal sealed class CountSameDayMatchesHandler(ExpensesDbContext db)
+    : IQueryHandler<CountSameDayMatches, int>
+{
+    public async Task<int> HandleAsync(CountSameDayMatches query, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var currency = Currency.FromCode(query.CurrencyCode);
+
+        var totals = await db.Expenses
+            .AsNoTracking()
+            .Where(expense => expense.OccurredOn == query.Date
+                && expense.Lines.All(line => line.Amount.Currency == currency))
+            .Select(expense => expense.Lines.Sum(line => line.Amount.Amount))
+            .ToListAsync(ct);
+
+        return totals.Count(total => total == query.Total);
+    }
+}
+
+/// <summary>
 /// Resolves external item text to a learned <see cref="ItemMapping"/> by <b>exact</b> match on the normalised
 /// source text (0021): a hit is a previously-seen line, a miss is a new item the user resolves manually. No
 /// semantic/embedding recognition — that guessed wrong (لیمو→هویج) and is dropped from the read path.

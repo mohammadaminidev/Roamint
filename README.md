@@ -16,7 +16,7 @@ See [`docs/features/`](docs/features) for per-slice design records (`0001`–`00
 
 - [x] Solution scaffold
 - [x] Expenses module — domain (Expense, Category) with strongly-typed IDs, EF Core persistence, outbox-backed events (capture done; drain lands with the first consumer)
-- [x] Add-expense form — mobile-first, one-handed thumb input; per-item categories + optional quantities (g/ml/Pcs), derived total, item autocomplete carrying category + unit + tags, category suggestion
+- [x] Add-expense form — mobile-first, one-handed thumb input; per-item categories + optional quantities (g/ml/Pcs), derived total, item autocomplete carrying category + unit + tags, category suggestion, duplicate-guard confirmation on a same-day/-currency/-total twin (0022)
 - [x] Tags — scoped (per-category) + global classification axis; managed vocabulary with per-line picker and inline create
 - [x] Exchange rates — `Exchange` + `ExchangeRate` aggregates; USD-triangulated display conversion; manual override
 - [x] Expense list — date-range / category filters; display-denomination conversion ("All" = originals) with missing-rate routing to the rate page

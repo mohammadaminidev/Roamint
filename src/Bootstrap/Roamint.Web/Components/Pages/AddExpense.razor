@@ -161,7 +161,7 @@
 
         <div class="field">
             <label>Date</label>
-            <input type="date" @bind="date" max="@today.ToString("yyyy-MM-dd")" />
+            <input type="date" @bind="date" @bind:after="ResetDuplicateGuard" max="@today.ToString("yyyy-MM-dd")" />
         </div>
 
         <div class="field">
@@ -176,6 +176,16 @@
         @if (success is not null)
         {
             <p class="success">@success</p>
+        }
+        @if (duplicateMatches > 0)
+        {
+            <div class="confirm">
+                <p>You already logged @TotalDisplay @currencyCode on this date (@duplicateMatches existing). Save anyway?</p>
+                <div class="confirm-actions">
+                    <button type="button" class="confirm-save" disabled="@submitting" @onclick="ConfirmDuplicate">Save anyway</button>
+                    <button type="button" class="confirm-cancel" @onclick="DismissDuplicate">Review</button>
+                </div>
+            </div>
         }
     </div>
 
@@ -241,6 +251,11 @@
     private bool submitting;
     private string? error;
     private string? success;
+
+    // Duplicate guard (0022): count of same-day/-currency/-total twins found on the last save attempt, and
+    // whether the user has confirmed past them. duplicateMatches > 0 shows the inline confirm banner.
+    private int duplicateMatches;
+    private bool duplicateConfirmed;
 
     // Set when reviewing a handed-off capture: which source to link back to on confirm, and its id.
     private (CaptureSource Source, Guid Id)? linkTarget;
@@ -368,6 +383,7 @@
     {
         currencyCode = code;
         error = null;
+        ResetDuplicateGuard();
     }
 
     // ---- Categories (per line) ----
@@ -456,11 +472,13 @@
     {
         lines.Add(NewLine());
         error = null;
+        ResetDuplicateGuard();
     }
 
     private void RemoveLine(int index)
     {
         lines.RemoveAt(index);
+        ResetDuplicateGuard();
         if (expandedCatLine == index)
         {
             expandedCatLine = null;
@@ -481,6 +499,7 @@
     {
         lines[index].AmountText = e.Value?.ToString() ?? string.Empty;
         error = null;
+        ResetDuplicateGuard();
     }
 
     private void OnLineQtyInput(int index, ChangeEventArgs e) =>
@@ -663,6 +682,18 @@
             return;
         }
 
+        // Duplicate guard (0022): warn once if an expense with this day + currency + total already exists.
+        // A soft prompt, not a block — equal-total same-day expenses are legal. Confirming sets the flag so
+        // the re-run skips straight to the save; any edit to the total/day/currency clears it (ResetDuplicateGuard).
+        if (!duplicateConfirmed)
+        {
+            duplicateMatches = await Queries.CountSameDayMatchesAsync(date, currencyCode, DerivedTotal());
+            if (duplicateMatches > 0)
+            {
+                return;
+            }
+        }
+
         submitting = true;
         try
         {
@@ -693,6 +724,8 @@
             lines.Add(NewLine());
             expandedCatLine = null;
             expandedTagLine = null;
+            duplicateMatches = 0;
+            duplicateConfirmed = false;
         }
         catch (DomainException ex)
         {
@@ -703,6 +736,25 @@
         {
             submitting = false;
         }
+    }
+
+    // User accepted the twin — record anyway. Re-runs Submit with the confirmed flag set so the guard passes.
+    private async Task ConfirmDuplicate()
+    {
+        duplicateConfirmed = true;
+        duplicateMatches = 0;
+        await Submit();
+    }
+
+    // User wants to review — drop the banner and return to editing without saving.
+    private void DismissDuplicate() => duplicateMatches = 0;
+
+    // Any change to the match key (total/day/currency) invalidates a pending confirmation, so the next save
+    // re-checks rather than committing on a stale "save anyway".
+    private void ResetDuplicateGuard()
+    {
+        duplicateMatches = 0;
+        duplicateConfirmed = false;
     }
 
     private bool TryBuildLines(out List<ExpenseLineDto> dtos, out string? lineError)
