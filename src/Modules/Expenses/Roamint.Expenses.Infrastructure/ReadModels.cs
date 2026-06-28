@@ -39,6 +39,10 @@ internal sealed class ListActiveCategoriesHandler(ExpensesDbContext db)
 internal sealed class ListTagsHandler(ExpensesDbContext db)
     : IQueryHandler<ListTags, IReadOnlyList<TagView>>
 {
+    // The grocery food-level tiers (0013 D9) are an ordered scale, not an alphabetical set — show them
+    // least-to-most discretionary. Any tag outside the scale ranks after them, ordered by name.
+    private static readonly string[] TierOrder = ["Essential", "Comfort", "Treat"];
+
     public async Task<IReadOnlyList<TagView>> HandleAsync(ListTags query, CancellationToken ct)
     {
         var tags = db.Tags.AsNoTracking().Where(tag => tag.Status == TagStatus.Active);
@@ -50,11 +54,20 @@ internal sealed class ListTagsHandler(ExpensesDbContext db)
         }
 
         var rows = await tags
-            .OrderBy(tag => tag.Name)
             .Select(tag => new { tag.Id, tag.Name, tag.Scope })
             .ToListAsync(ct);
 
-        return rows.Select(row => new TagView(row.Id.Value, row.Name, row.Scope?.Value)).ToList();
+        return rows
+            .OrderBy(row => TierRank(row.Name))
+            .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(row => new TagView(row.Id.Value, row.Name, row.Scope?.Value))
+            .ToList();
+    }
+
+    private static int TierRank(string name)
+    {
+        var index = Array.IndexOf(TierOrder, name);
+        return index < 0 ? int.MaxValue : index;
     }
 }
 
