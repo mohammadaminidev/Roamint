@@ -499,7 +499,21 @@
         QueueSuggest($"line-{index}", text);
     }
 
-    private async Task OnLineBlur(int index) => await SuggestCategoryFor(index, lines[index].Description);
+    private async Task OnLineBlur(int index)
+    {
+        await SuggestCategoryFor(index, lines[index].Description);
+
+        // Drop the dropdown once focus leaves the field, so it doesn't linger when the user moves on without
+        // picking. Blur fires before a suggestion's click, so wait briefly: PickSuggestion clears the active key
+        // first, and if it did we skip clearing here (the pick already handled it).
+        var key = $"line-{index}";
+        await Task.Delay(200);
+        if (activeSuggestKey == key)
+        {
+            ClearSuggestions();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
 
     // Total is the plain sum of paid line amounts, each rounded to the currency's minor units — the same
     // arithmetic the aggregate re-derives, so the read-only total can never diverge from what is stored.
