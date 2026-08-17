@@ -82,22 +82,26 @@ internal sealed class InMemoryItemMappingRepository : IItemMappingRepository
 {
     private readonly Dictionary<string, ItemMapping> _byText = [];
 
-    public Dictionary<ItemMappingId, float[]> Embeddings { get; } = [];
+    public Dictionary<ItemMappingId, float[]?> Embeddings { get; } = [];
 
     public Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct) =>
         Task.FromResult(_byText.GetValueOrDefault(normalizedSourceText));
 
-    public Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    public Task AddAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct)
     {
         _byText[mapping.SourceText] = mapping;
         Embeddings[mapping.Id] = embedding;
         return Task.CompletedTask;
     }
 
-    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct)
     {
         _byText[mapping.SourceText] = mapping;
-        Embeddings[mapping.Id] = embedding;
+        if (embedding is not null)
+        {
+            Embeddings[mapping.Id] = embedding;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -113,6 +117,13 @@ internal sealed class FakeItemEmbedder : IItemEmbedder
         Embedded.Add(text);
         return Task.FromResult(new[] { 0.1f, 0.2f, 0.3f });
     }
+}
+
+// Stands in for an offline/unreachable embedder (e.g. Ollama not running).
+internal sealed class ThrowingItemEmbedder : IItemEmbedder
+{
+    public Task<float[]> EmbedAsync(string text, CancellationToken ct) =>
+        throw new HttpRequestException("embedder offline");
 }
 
 internal sealed class FakeUnitOfWork : IUnitOfWork

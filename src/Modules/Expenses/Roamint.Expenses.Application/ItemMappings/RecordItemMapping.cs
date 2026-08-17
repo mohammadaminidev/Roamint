@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Roamint.Application.Abstractions;
 using Roamint.Expenses.Domain;
 
@@ -29,7 +30,10 @@ internal sealed class RecordItemMappingHandler(
             ?? throw new CategoryNotFoundException(command.CategoryId);
 
         var normalized = ItemMapping.Normalize(command.SourceText);
-        var embedding = await embedder.EmbedAsync(normalized, ct);
+
+        // The embedding is dormant (kept for Insights; matching is exact-text since 0021), so a missing
+        // embedder must not sink the learned mapping. Degrade to a null vector and still record the item.
+        var embedding = await TryEmbedAsync(normalized, ct);
 
         var existing = await mappings.FindBySourceTextAsync(normalized, ct);
         if (existing is null)
@@ -50,5 +54,23 @@ internal sealed class RecordItemMappingHandler(
         }
 
         await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    // Best-effort embed: a down or unreachable embedder yields a null vector rather than aborting the learn.
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "The embedding is non-essential (Insights-only, dormant for matching); any embedder "
+            + "failure must degrade to a null vector so the mapping is still recorded.")]
+    private async Task<float[]?> TryEmbedAsync(string normalized, CancellationToken ct)
+    {
+        try
+        {
+            return await embedder.EmbedAsync(normalized, ct);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 }

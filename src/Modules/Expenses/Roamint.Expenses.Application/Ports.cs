@@ -35,15 +35,18 @@ public interface IExpenseRepository
 
 /// <summary>Write-side access to learned <see cref="ItemMapping"/>s. The embedding is supplied alongside the
 /// aggregate — it is an Infrastructure concern (the domain holds no vector) and is now kept only for Insights.
-/// Upsert is by normalised source text, which is also the exact key reads recognise by (see <c>MatchItem</c>).</summary>
+/// Upsert is by normalised source text, which is also the exact key reads recognise by (see <c>MatchItem</c>).
+/// The embedding is optional: a <c>null</c> vector (e.g. the embedder was offline) still records the mapping,
+/// leaving the vector column empty rather than dropping the learned item — matching no longer needs it (0021).</summary>
 public interface IItemMappingRepository
 {
     Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct);
 
-    Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct);
+    Task AddAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct);
 
-    /// <summary>Persist a revised mapping's recomputed embedding.</summary>
-    Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct);
+    /// <summary>Persist a revised mapping, replacing its embedding when a fresh vector is supplied; a
+    /// <c>null</c> vector leaves the existing embedding untouched.</summary>
+    Task UpdateEmbeddingAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct);
 }
 
 /// <summary>Produces an embedding vector for item text (local bge-m3 by default; see 0016). Only the learning

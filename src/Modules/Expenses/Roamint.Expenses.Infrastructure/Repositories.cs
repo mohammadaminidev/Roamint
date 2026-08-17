@@ -75,16 +75,25 @@ internal sealed class ItemMappingRepository(ExpensesDbContext db) : IItemMapping
     public Task<ItemMapping?> FindBySourceTextAsync(string normalizedSourceText, CancellationToken ct) =>
         db.ItemMappings.FirstOrDefaultAsync(mapping => mapping.SourceText == normalizedSourceText, ct);
 
-    public Task AddAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    public Task AddAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct)
     {
         var entry = db.ItemMappings.Add(mapping);
-        entry.Property("Embedding").CurrentValue = new Vector(embedding); // set the shadow vector column.
+        if (embedding is not null)
+        {
+            entry.Property("Embedding").CurrentValue = new Vector(embedding); // set the shadow vector column.
+        }
+
         return Task.CompletedTask;
     }
 
-    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[] embedding, CancellationToken ct)
+    public Task UpdateEmbeddingAsync(ItemMapping mapping, float[]? embedding, CancellationToken ct)
     {
-        db.Entry(mapping).Property("Embedding").CurrentValue = new Vector(embedding);
+        // A null vector (embedder offline) leaves the stored embedding as-is rather than wiping it.
+        if (embedding is not null)
+        {
+            db.Entry(mapping).Property("Embedding").CurrentValue = new Vector(embedding);
+        }
+
         return Task.CompletedTask;
     }
 }

@@ -55,6 +55,27 @@ public sealed class RecordItemMappingTests
     }
 
     [Fact]
+    public async Task Records_mapping_with_null_embedding_when_embedder_is_offline()
+    {
+        // Matching is exact-text since 0021; the embedding is dormant, so a down embedder must not drop the
+        // learned item — the mapping is still recorded, just with no vector.
+        var clock = NewClock();
+        var categories = new InMemoryCategoryRepository();
+        var cat = categories.Seed(Category.Create(CategoryId.New(clock), "Food")).Id;
+        var mappings = new InMemoryItemMappingRepository();
+        var uow = new FakeUnitOfWork();
+        var handler = new RecordItemMappingHandler(mappings, categories, new ThrowingItemEmbedder(), uow, clock);
+
+        await handler.HandleAsync(
+            new RecordItemMapping("Պանիր", "پنیر", "g", cat), TestContext.Current.CancellationToken);
+
+        var mapping = mappings.All.ShouldHaveSingleItem();
+        mapping.CanonicalDescription.ShouldBe("پنیر");
+        mappings.Embeddings[mapping.Id].ShouldBeNull();
+        uow.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Rejects_unknown_category_without_saving()
     {
         var (handler, mappings, _, uow, _) = NewHandler();
