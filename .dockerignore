@@ -1,0 +1,17 @@
+# Keep the build context small and free of local/private state.
+# See docs/features/0023-oracle-deployment.md.
+**/bin/
+**/obj/
+**/.vs/
+.git/
+.github/
+.vscode/
+TestResults/
+tests/
+docs/
+seed/
+scripts/
+deploy/
+**/*.user
+# Local receipt images / private data (also gitignored) — never bake into the image.
+**/App_Data/receipts/
