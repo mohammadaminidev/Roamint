@@ -43,11 +43,11 @@ dotnet test
 
 ## Screenshots
 
-<!-- Uncomment once the PNGs exist in docs/screenshots/ (see docs/screenshots/README.md).
-| Add expense (mobile) | Monthly summary | Receipt OCR review |
+| Add expense | Monthly summary | Receipt OCR review |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/add-expense-mobile.png" alt="Add-expense form on a phone" width="260"> | <img src="docs/screenshots/monthly-summary.png" alt="Monthly summary with per-category totals" width="420"> | <img src="docs/screenshots/receipt-review.png" alt="Receipt OCR review pre-filling the expense form" width="260"> |
--->
+| <img src="docs/screenshots/add-expense-mobile.png" alt="Add-expense form with three item lines, per-line categories and tags" width="260"> | <img src="docs/screenshots/monthly-summary.png" alt="Reports home: October spend by category in AMD with month-over-month deltas" width="260"> | <img src="docs/screenshots/receipt-review.png" alt="Review form pre-filled by Gemini OCR from an Armenian receipt, items translated to Farsi" width="260"> |
+
+<sub>Demo data only: a throwaway database seeded with made-up expenses. The receipt is a synthetic Armenian receipt read by the real Gemini OCR pipeline.</sub>
 
 ## Status
 
