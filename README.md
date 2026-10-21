@@ -41,6 +41,14 @@ Open the dashboard link printed to stdout, then the `web` resource. Receipt OCR 
 dotnet test
 ```
 
+## Screenshots
+
+<!-- Uncomment once the PNGs exist in docs/screenshots/ (see docs/screenshots/README.md).
+| Add expense (mobile) | Monthly summary | Receipt OCR review |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/add-expense-mobile.png" alt="Add-expense form on a phone" width="260"> | <img src="docs/screenshots/monthly-summary.png" alt="Monthly summary with per-category totals" width="420"> | <img src="docs/screenshots/receipt-review.png" alt="Receipt OCR review pre-filling the expense form" width="260"> |
+-->
+
 ## Status
 
 **In daily use.** Three modules are built — **Expenses**, **Wallet**, and **Receipts** — and a fourth, **Insights**, is planned. V1 is done except category management (deliberately postponed; a seed list plus SQL covers it for now). The V2 capture features — receipt OCR, item matching, clipboard order import, live camera over HTTPS, background processing, installable PWA — have shipped; natural-language queries and spreadsheet export are still open. Aspire AppHost orchestrates Postgres (`pgvector/pgvector:pg17`), PgAdmin, and the Blazor Server host.
