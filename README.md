@@ -1,5 +1,7 @@
 # Roamint
 
+[![CI](https://github.com/mohammadaminidev/Roamint/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/mohammadaminidev/Roamint/actions/workflows/ci.yml)
+
 Personal multi-currency expense tracker for daily use by an expat in Armenia. Multi-currency by necessity (cash USD, cash AMD, USDT), single-tenant by design.
 
 Also a portfolio piece — modular monolith on .NET 10 with .NET Aspire, Blazor Server, PostgreSQL + pgvector, OpenTelemetry, and DDD-style bounded contexts.
