@@ -8,6 +8,9 @@
   <ItemGroup Label="Aspire hosting">
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
+    <!-- Transitive via Aspire.Hosting → StreamJsonRpc; 2.5.302 trips NU1902 (GHSA-qhrr-8q5h-9q3h)
+         under warnings-as-errors. Drop once Aspire ships a StreamJsonRpc on a patched MessagePack. -->
+    <PackageVersion Include="MessagePack" Version="2.5.307" />
   </ItemGroup>
   <ItemGroup Label="Application">
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
