@@ -6,6 +6,39 @@ Also a portfolio piece — modular monolith on .NET 10 with .NET Aspire, Blazor 
 
 > **Privacy:** This repo is public. The real data is not. Seed values and screenshots use anonymized data. The schema is single-tenant and not hardened for multi-user.
 
+## For reviewers
+
+**What this project shows**
+
+- **Modular monolith on .NET 10 + Aspire** — three bounded contexts (Expenses, Wallet, Receipts) deployed as one Blazor Server host; the AppHost orchestrates Postgres, PgAdmin, and the web app for local dev.
+- **Schema per module** — each module owns a Postgres schema, `DbContext`, and migrations history; no cross-schema foreign keys; the host references only each module's `Contracts` project.
+- **DDD-style bounded contexts** — aggregates with private setters and factory methods, strongly-typed IDs (`record struct` over `Guid.CreateVersion7()`), value objects (`Money`, `CurrencyPair`), domain events captured to a transactional outbox, a hand-rolled CQS dispatcher, and vertical-slice use cases (one file per command/query + handler).
+- **Tests against real Postgres** — 225 tests (xUnit v3 + Shouldly); persistence and read-model tests run against a throwaway `pgvector` container via Testcontainers.
+- **OpenTelemetry** — logs, metrics, and traces exported over OTLP to the Aspire dashboard via a shared `ServiceDefaults` project.
+- **LLM OCR behind Microsoft.Extensions.AI** — receipt photos go to Gemini 2.5 Flash through an `IChatClient` over an OpenAI-compatible endpoint; the provider is config-swappable and a stub takes over when no key is set.
+
+**Three design records worth reading**
+
+- [`0021` — Exact item matching](docs/features/0021-uncertain-item-matching.md): reversing an embedding-similarity design (0016) after it produced confident wrong matches on real receipts (lemon → carrot), and choosing exact-or-manual instead.
+- [`0015` — Receipt OCR](docs/features/0015-receipts-ocr.md): picking a vision model under real constraints — a local 8 GB VLM read the numbers but not Armenian script; `gemini-2.0-flash` had a zero free-tier quota.
+- [`0010` — Wallet exchange rates](docs/features/0010-wallet-rates.md): keeping FX out of the expense aggregate, a natural composite key (`CurrencyPair`), and USD-spoke triangulation for display conversion.
+
+All 22 records are indexed in [`docs/README.md`](docs/README.md).
+
+**Run it** (needs the .NET 10 SDK and Docker):
+
+```powershell
+dotnet run --project src/Hosting/Roamint.AppHost --launch-profile http
+```
+
+Open the dashboard link printed to stdout, then the `web` resource. Receipt OCR needs a Gemini key (`dotnet user-secrets set Ocr:ApiKey <key> --project src/Bootstrap/Roamint.Web`); without one, a stub returns an empty draft and the form is filled by hand.
+
+**Run the tests** (Docker must be running for the Testcontainers suites):
+
+```powershell
+dotnet test
+```
+
 ## Status
 
 **In daily use.** Three modules are built — **Expenses**, **Wallet**, and **Receipts** — and a fourth, **Insights**, is planned. V1 is done except category management (deliberately postponed; a seed list plus SQL covers it for now). The V2 capture features — receipt OCR, item matching, clipboard order import, live camera over HTTPS, background processing, installable PWA — have shipped; natural-language queries and spreadsheet export are still open. Aspire AppHost orchestrates Postgres (`pgvector/pgvector:pg17`), PgAdmin, and the Blazor Server host.
@@ -74,13 +107,13 @@ First run pulls `pgvector/pgvector:pg17` and `dpage/pgadmin4`. Postgres data per
 | Web UI               | Blazor Server (`Roamint.Web`)                                |
 | Orchestration (dev)  | .NET Aspire 13.4 (AppHost SDK 13.3.2)                        |
 | Database             | PostgreSQL 17 + `pgvector`                                   |
-| ORM                  | EF Core 10 (writes), Dapper (reads)                          |
+| ORM                  | EF Core 10 (writes + no-tracking read models; Dapper planned for analytics) |
 | Tests                | xUnit v3 (Microsoft.Testing.Platform), Shouldly, Testcontainers.PostgreSql |
 | Telemetry            | OpenTelemetry (logs, metrics, traces via OTLP)               |
 | LLM abstraction      | Microsoft.Extensions.AI over an OpenAI-compatible endpoint (Gemini 2.5 Flash for OCR) |
 | Dispatcher           | Hand-rolled in-process; no MediatR                           |
 
-## Architecture in one paragraph
+## Architecture
 
 Modular monolith with three bounded contexts built — Expenses, Wallet, Receipts — and Insights planned. Each module owns its schema (`expenses.`, `wallet.`, `receipts.`) in one Postgres database, with its own `DbContext` and migrations history; no foreign keys cross schemas (a receipt references its expense by plain ID). Inside each module: Domain → Application → Infrastructure → Contracts, and the web host references only `Contracts`.
 
