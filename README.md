@@ -133,4 +133,4 @@ Modular monolith with three bounded contexts built — Expenses, Wallet, Receipt
 
 ## License
 
-TBD.
+[MIT](LICENSE) © 2026 Mohammad Amini.
