@@ -12,7 +12,3 @@ Images referenced from the root README. **Anonymized data only** — never captu
 Captured at 390 × 844, device scale 2, against a throwaway Postgres container (never the real
 `roamint-pgdata` volume) seeded through `/import` with a made-up CSV. The receipt shot is a
 synthetic Armenian receipt fed through headless Edge's fake camera and read by Gemini.
-
-Known issue found while capturing: **Choose photo** on `/receipts/new` fails (`OnFile` sets
-`busy` and re-renders, which removes the `<InputFile>` before its stream is read); the live
-camera path works.

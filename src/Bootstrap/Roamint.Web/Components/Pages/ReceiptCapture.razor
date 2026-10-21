@@ -160,20 +160,23 @@
 
         error = null;
         justQueued = false;
-        busy = true;
-        StateHasChanged();
 
         byte[] resized;
         try
         {
-            // Read the original bytes, then downscale them in the browser through the same
-            // canvas pipeline as the live camera so the file path saves Gemini tokens too.
+            // Read the original bytes BEFORE flipping to busy: busy hides the <InputFile>, and Blazor
+            // streams the file from that element, so unmounting it mid-read fails ("_blazorFilesById").
             using var buffer = new MemoryStream();
             await using (var stream = file.OpenReadStream(MaxBytes))
             {
                 await stream.CopyToAsync(buffer);
             }
 
+            busy = true;
+            StateHasChanged();
+
+            // Downscale in the browser through the same canvas pipeline as the live camera so the
+            // file path saves Gemini tokens too.
             var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
             resized = await (await ModuleAsync()).InvokeAsync<byte[]>("resizeFile", buffer.ToArray(), contentType);
         }
