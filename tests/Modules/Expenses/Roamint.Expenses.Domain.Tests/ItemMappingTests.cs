@@ -18,7 +18,7 @@ public class ItemMappingTests
         var mapping = ItemMapping.Create(
             ItemMappingId.New(Clock), "  Պանիր   Չանախ  ", "پنیر چاناخ", "g", Cat, Clock);
 
-        mapping.SourceText.ShouldBe("Պանիր Չանախ");
+        mapping.SourceText.ShouldBe("պանիր չանախ");
         mapping.CanonicalDescription.ShouldBe("پنیر چاناخ");
         mapping.Unit.ShouldBe("g");
         mapping.CategoryId.ShouldBe(Cat);
@@ -62,6 +62,6 @@ public class ItemMappingTests
         mapping.Unit.ShouldBe("Pcs");
         mapping.CategoryId.ShouldBe(newCat);
         mapping.LastUsedOnUtc.ShouldBe(clock.GetUtcNow());
-        mapping.SourceText.ShouldBe("Պանիր");
+        mapping.SourceText.ShouldBe("պանիր");
     }
 }
