@@ -16,7 +16,8 @@ public interface IInboxApi
     /// failed (extractor unavailable).</summary>
     Task<ParseInboxItemResult> ParseAsync(Guid itemId, CancellationToken ct = default);
 
-    /// <summary>Marks an unread item as not for Roamint (sender isn't a household member).</summary>
+    /// <summary>Marks an item as not to be recorded: a sender who isn't a household member, or a message the user
+    /// dismissed from review (0026). A linked item can't be ignored.</summary>
     Task IgnoreAsync(Guid itemId, CancellationToken ct = default);
 
     /// <summary>Links a parsed item to the expense recorded from it.</summary>
@@ -32,8 +33,9 @@ public interface IInboxApi
     /// <summary>An item's current state; null if the id is unknown.</summary>
     Task<InboxItemDto?> GetAsync(Guid itemId, CancellationToken ct = default);
 
-    /// <summary>Ids of unsettled items (received, awaiting review, failed), oldest first — for the startup sweep.</summary>
-    Task<IReadOnlyList<Guid>> ListOpenAsync(CancellationToken ct = default);
+    /// <summary>Unsettled items (received, awaiting review, failed), oldest first — for the inbox page (0026) and
+    /// the startup sweep.</summary>
+    Task<IReadOnlyList<InboxItemDto>> ListOpenAsync(CancellationToken ct = default);
 }
 
 /// <summary>One drained relay row: source tag, the source's message id, and the raw stored payload.</summary>

@@ -160,6 +160,22 @@ public sealed class InboxTests
     }
 
     [Fact]
+    public async Task A_parsed_item_awaiting_review_can_be_dismissed()
+    {
+        var (repo, id) = await AcceptedAsync();
+        await new ParseInboxItemHandler(
+                repo, new StubExtractor(new InboxExtraction(true, 1m, "AMD", "x", null)), new FakeUnitOfWork())
+            .HandleAsync(new ParseInboxItem(id), TestContext.Current.CancellationToken);
+        var uow = new FakeUnitOfWork();
+
+        await new IgnoreInboxItemHandler(repo, uow)
+            .HandleAsync(new IgnoreInboxItem(id), TestContext.Current.CancellationToken);
+
+        repo.All.Single().Status.ShouldBe(InboxItemStatus.Ignored);
+        uow.SaveCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task React_and_reply_go_to_the_notifier()
     {
         var (repo, id) = await AcceptedAsync();

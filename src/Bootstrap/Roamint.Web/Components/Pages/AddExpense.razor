@@ -5,6 +5,7 @@
 @using Roamint.Receipts.Contracts
 @using Roamint.SharedKernel
 @using Roamint.Web.Capture
+@using Roamint.Web.Processing
 @using Roamint.Web.Services
 @implements IDisposable
 @inject IExpensesApi Api
@@ -14,6 +15,8 @@
 @inject IInboxApi InboxApi
 @inject Household Household
 @inject CaptureHandoff Handoff
+@inject InboxBoard InboxBoard
+@inject NavigationManager Nav
 @inject TimeProvider Clock
 
 <PageTitle>Add expense · Roamint</PageTitle>
@@ -782,6 +785,7 @@
 
             // If this expense came from a capture, link the source to the expense (host orchestration — 0015/
             // 0017) and learn each line's mapping so the next capture resolves it automatically (0016).
+            var reviewedTelegram = false;
             if (linkTarget is (CaptureSource source, Guid sourceId))
             {
                 switch (source)
@@ -795,6 +799,8 @@
                     case CaptureSource.Inbox:
                         await InboxApi.LinkAsync(sourceId, expenseId);
                         await MarkInboxRecordedAsync(sourceId);
+                        InboxBoard.Raise();
+                        reviewedTelegram = true;
                         break;
                 }
 
@@ -810,6 +816,12 @@
             expandedTagLine = null;
             duplicateMatches = 0;
             duplicateConfirmed = false;
+
+            // Working through the Telegram inbox (0026): straight back to the next message.
+            if (reviewedTelegram)
+            {
+                Nav.NavigateTo("/inbox");
+            }
         }
         catch (DomainException ex)
         {

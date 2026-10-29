@@ -84,8 +84,21 @@ public class InboxItemTests
 
         var parsed = Received();
         parsed.Parse(OneLine());
-        Should.Throw<DomainException>(() => parsed.Ignore());
         Should.Throw<DomainException>(() => parsed.MarkFailed());
+    }
+
+    [Fact]
+    public void A_parsed_item_can_be_dismissed_but_a_linked_one_cannot()
+    {
+        var parsed = Received();
+        parsed.Parse(OneLine());
+        parsed.Ignore();
+        parsed.Status.ShouldBe(InboxItemStatus.Ignored);
+
+        var linked = Received();
+        linked.Parse(OneLine());
+        linked.LinkTo(Guid.CreateVersion7());
+        Should.Throw<DomainException>(() => linked.Ignore());
     }
 
     [Fact]

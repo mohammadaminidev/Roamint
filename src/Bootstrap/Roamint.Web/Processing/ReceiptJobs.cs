@@ -88,36 +88,6 @@ public sealed class ReceiptJobs
         await _queue.Writer.WriteAsync(receiptId, ct);
     }
 
-    /// <summary>Adds an already-processed capture as a reviewable row without queueing it — the inbox worker's
-    /// "needs review" outcome (0024). The id is the inbox item's; a row already tracked is left as-is.</summary>
-    public void AddReady(Guid id, CaptureSeed seed, string title, decimal total)
-    {
-        ArgumentNullException.ThrowIfNull(seed);
-
-        lock (_gate)
-        {
-            if (_jobs.ContainsKey(id))
-            {
-                return;
-            }
-
-            _jobs[id] = new ReceiptJob
-            {
-                ReceiptId = id,
-                Sequence = ++_sequence,
-                Stage = ReceiptJobStage.Ready,
-                Seed = seed,
-                Merchant = title,
-                Total = total,
-                ItemCount = seed.Lines.Count,
-                CurrencyCode = seed.CurrencyCode,
-            };
-            Trim();
-        }
-
-        Raise();
-    }
-
     /// <summary>The worker's drain loop — yields queued receipt ids until the host shuts down.</summary>
     public IAsyncEnumerable<Guid> DequeueAllAsync(CancellationToken ct) => _queue.Reader.ReadAllAsync(ct);
 

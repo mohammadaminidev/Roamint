@@ -6,24 +6,44 @@ using Roamint.Receipts.Contracts;
 namespace Roamint.Web.Processing;
 
 /// <summary>The in-process backlog of inbox item ids awaiting <see cref="InboxProcessor"/> (0024). A singleton
-/// between the puller (producer) and the processing worker (single consumer).</summary>
+/// between the puller (producer) and the processing worker (single consumer). Also carries the inbox page's
+/// "check now" request to the puller (0026), so the relay is still drained from one place only.</summary>
 public sealed class InboxBacklog
 {
     private readonly Channel<Guid> _channel = Channel.CreateUnbounded<Guid>(new UnboundedChannelOptions { SingleReader = true });
 
+    // At most one pending request: taps while a pull is already due collapse into it.
+    private readonly Channel<bool> _pullRequests = Channel.CreateBounded<bool>(
+        new BoundedChannelOptions(1) { SingleReader = true, FullMode = BoundedChannelFullMode.DropWrite });
+
     public ValueTask EnqueueAsync(Guid itemId, CancellationToken ct) => _channel.Writer.WriteAsync(itemId, ct);
 
     public IAsyncEnumerable<Guid> DequeueAllAsync(CancellationToken ct) => _channel.Reader.ReadAllAsync(ct);
+
+    public void RequestPull() => _pullRequests.Writer.TryWrite(true);
+
+    public ValueTask<bool> WaitForPullRequestAsync(CancellationToken ct) => _pullRequests.Reader.ReadAsync(ct);
+}
+
+/// <summary>Raised whenever the set of open inbox items may have changed — accepted from the relay or settled by
+/// the worker (0026). The inbox page and the job bar's summary row re-query on it; never polled.</summary>
+public sealed class InboxBoard
+{
+    public event Action? Changed;
+
+    public void Raise() => Changed?.Invoke();
 }
 
 /// <summary>
 /// Drains the Cloudflare relay into Receipts (0024): on startup it first re-enqueues unsettled items (a crash, a
-/// restart, or items still awaiting review), then pulls the relay now and every minute. Each batch is persisted
-/// before it is acked, so a crash in between only means a redelivery that the accept step dedups. An unreachable
-/// relay is logged and retried on the next tick; a missing <c>InboxRelay</c> config leaves only the sweep running.
+/// restart, or items still awaiting review), then pulls the relay now, every minute, and whenever the inbox page
+/// asks (0026). Each batch is persisted before it is acked, so a crash in between only means a redelivery that the
+/// accept step dedups. An unreachable relay is logged and retried on the next tick; a missing <c>InboxRelay</c>
+/// config leaves only the sweep running.
 /// </summary>
 internal sealed partial class InboxPuller(
     InboxBacklog queue,
+    InboxBoard board,
     InboxRelayClient relay,
     IOptions<InboxRelayOptions> options,
     IServiceScopeFactory scopes,
@@ -36,9 +56,9 @@ internal sealed partial class InboxPuller(
         await using (var scope = scopes.CreateAsyncScope())
         {
             var inbox = scope.ServiceProvider.GetRequiredService<IInboxApi>();
-            foreach (var itemId in await inbox.ListOpenAsync(stoppingToken))
+            foreach (var item in await inbox.ListOpenAsync(stoppingToken))
             {
-                await queue.EnqueueAsync(itemId, stoppingToken);
+                await queue.EnqueueAsync(item.ItemId, stoppingToken);
             }
         }
 
@@ -48,12 +68,26 @@ internal sealed partial class InboxPuller(
             return;
         }
 
-        using var timer = new PeriodicTimer(Interval);
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
             await PullAsync(stoppingToken);
+            await WaitForNextPullAsync(stoppingToken);
         }
-        while (await timer.WaitForNextTickAsync(stoppingToken));
+    }
+
+    // The next tick, or sooner if the inbox page asked to check now.
+    private async Task WaitForNextPullAsync(CancellationToken stoppingToken)
+    {
+        using var tick = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        tick.CancelAfter(Interval);
+        try
+        {
+            await queue.WaitForPullRequestAsync(tick.Token);
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            // Interval elapsed.
+        }
     }
 
     private async Task PullAsync(CancellationToken ct)
@@ -80,6 +114,11 @@ internal sealed partial class InboxPuller(
                 foreach (var itemId in accepted)
                 {
                     await queue.EnqueueAsync(itemId, ct);
+                }
+
+                if (accepted.Count > 0)
+                {
+                    board.Raise();
                 }
 
                 LogPulled(logger, batch.Count, accepted.Count);
@@ -112,13 +151,15 @@ internal sealed partial class InboxPuller(
 /// <summary>Drains <see cref="InboxBacklog"/> serially (one extractor call at a time — the free-tier rate limit),
 /// a DI scope per item. One bad item is logged and left unsettled for the next startup sweep, never a dead loop.</summary>
 internal sealed partial class InboxProcessingWorker(
-    InboxBacklog queue, IServiceScopeFactory scopes, ILogger<InboxProcessingWorker> logger) : BackgroundService
+    InboxBacklog queue, InboxBoard board, IServiceScopeFactory scopes, ILogger<InboxProcessingWorker> logger)
+    : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (var itemId in queue.DequeueAllAsync(stoppingToken))
         {
             await ProcessAsync(itemId, stoppingToken);
+            board.Raise();
         }
     }
 

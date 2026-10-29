@@ -43,21 +43,21 @@ internal sealed class InboxApi(ICommandDispatcher commands, IQueryDispatcher que
     public async Task<InboxItemDto?> GetAsync(Guid itemId, CancellationToken ct = default)
     {
         var view = await queries.QueryAsync(new GetInboxItem(new InboxItemId(itemId)), ct);
-        return view is null
-            ? null
-            : new InboxItemDto(
-                view.ItemId,
-                view.Source,
-                view.SenderExternalId,
-                view.Text,
-                view.SentOnUtc,
-                view.Status,
-                view.LinkedExpenseId,
-                Mappings.ToDto(view.Draft));
+        return view is null ? null : ToDto(view);
     }
 
-    public Task<IReadOnlyList<Guid>> ListOpenAsync(CancellationToken ct = default) =>
-        queries.QueryAsync(new ListOpenInboxItems(), ct);
+    public async Task<IReadOnlyList<InboxItemDto>> ListOpenAsync(CancellationToken ct = default) =>
+        (await queries.QueryAsync(new ListOpenInboxItems(), ct)).Select(ToDto).ToList();
+
+    private static InboxItemDto ToDto(InboxItemView view) => new(
+        view.ItemId,
+        view.Source,
+        view.SenderExternalId,
+        view.Text,
+        view.SentOnUtc,
+        view.Status,
+        view.LinkedExpenseId,
+        Mappings.ToDto(view.Draft));
 
     private static InboxReaction ToReaction(InboxReactionKind kind) => kind switch
     {

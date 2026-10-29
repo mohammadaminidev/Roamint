@@ -5,7 +5,6 @@ using NSubstitute.ExceptionExtensions;
 using Roamint.Expenses.Contracts;
 using Roamint.Receipts.Contracts;
 using Roamint.SharedKernel;
-using Roamint.Web.Capture;
 using Roamint.Web.Processing;
 using Roamint.Web.Services;
 
@@ -23,7 +22,6 @@ public sealed class InboxProcessorTests
     private readonly IInboxApi _inbox = Substitute.For<IInboxApi>();
     private readonly IExpensesApi _expenses = Substitute.For<IExpensesApi>();
     private readonly IExpensesQueries _queries = Substitute.For<IExpensesQueries>();
-    private readonly ReceiptJobs _jobs = new();
 
     public InboxProcessorTests()
     {
@@ -40,7 +38,6 @@ public sealed class InboxProcessorTests
         {
             Members = { new HouseholdMember { Key = "sara", DisplayName = "Sara", TelegramUserId = SaraTelegramId } },
         })),
-        _jobs,
         NullLogger<InboxProcessor>.Instance);
 
     private static ParsedDraftDto Draft(decimal amount = 15000m, string? currency = "AMD", string text = "شام") =>
@@ -81,11 +78,10 @@ public sealed class InboxProcessorTests
         await _inbox.Received(1).ReactAsync(ItemId, InboxReactionKind.Recorded, Arg.Any<CancellationToken>());
         await _inbox.Received(1).ReplyAsync(
             ItemId, "15,000 AMD · شام · Dining Out · paid by Sara", Arg.Any<CancellationToken>());
-        _jobs.Snapshot().ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task An_unlearned_item_goes_to_review_with_the_payer_preselected()
+    public async Task An_unlearned_item_is_left_for_review()
     {
         GivenItem("Received");
         GivenParse("Parsed", Draft(text: "کافه"));
@@ -93,18 +89,8 @@ public sealed class InboxProcessorTests
         await ProcessAsync();
 
         await _expenses.DidNotReceiveWithAnyArgs().RecordExpenseAsync(default!, TestContext.Current.CancellationToken);
+        await _inbox.DidNotReceiveWithAnyArgs().IgnoreAsync(default, TestContext.Current.CancellationToken);
         await _inbox.Received(1).ReactAsync(ItemId, InboxReactionKind.NeedsReview, Arg.Any<CancellationToken>());
-        var job = _jobs.Snapshot().ShouldHaveSingleItem();
-        job.Stage.ShouldBe(ReceiptJobStage.Ready);
-        job.Merchant.ShouldBe("کافه");
-        var seed = job.Seed.ShouldNotBeNull();
-        seed.Source.ShouldBe(CaptureSource.Inbox);
-        seed.SourceId.ShouldBe(ItemId);
-        seed.PaidBy.ShouldBe("sara");
-        seed.Date.ShouldBe(Saturday);
-        var line = seed.Lines.ShouldHaveSingleItem();
-        line.SourceText.ShouldBe("کافه");
-        line.CategoryId.ShouldBeNull();
     }
 
     [Theory]
@@ -120,7 +106,7 @@ public sealed class InboxProcessorTests
         await ProcessAsync();
 
         await _expenses.DidNotReceiveWithAnyArgs().RecordExpenseAsync(default!, TestContext.Current.CancellationToken);
-        _jobs.Snapshot().ShouldHaveSingleItem().Seed!.Lines[0].CategoryId.ShouldBe(DiningId);
+        await _inbox.Received(1).ReactAsync(ItemId, InboxReactionKind.NeedsReview, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -149,7 +135,7 @@ public sealed class InboxProcessorTests
         await ProcessAsync();
 
         await _inbox.DidNotReceiveWithAnyArgs().LinkAsync(default, default, TestContext.Current.CancellationToken);
-        _jobs.Snapshot().ShouldHaveSingleItem();
+        await _inbox.Received(1).ReactAsync(ItemId, InboxReactionKind.NeedsReview, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -176,7 +162,6 @@ public sealed class InboxProcessorTests
 
         await _inbox.Received(1).ReactAsync(ItemId, reaction, Arg.Any<CancellationToken>());
         await _expenses.DidNotReceiveWithAnyArgs().RecordExpenseAsync(default!, TestContext.Current.CancellationToken);
-        _jobs.Snapshot().ShouldBeEmpty();
     }
 
     [Fact]
@@ -196,7 +181,7 @@ public sealed class InboxProcessorTests
     {
         GivenItem("Received");
         var processor = new InboxProcessor(
-            _inbox, _expenses, _queries, new Household(Options.Create(new HouseholdOptions())), _jobs,
+            _inbox, _expenses, _queries, new Household(Options.Create(new HouseholdOptions())),
             NullLogger<InboxProcessor>.Instance);
 
         await processor.ProcessAsync(ItemId, TestContext.Current.CancellationToken);

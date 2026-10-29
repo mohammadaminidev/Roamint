@@ -95,9 +95,11 @@ public sealed class InboxPersistenceTests(PostgresFixture fixture)
 
             var open = await new ListOpenInboxItemsHandler(db).HandleAsync(
                 new ListOpenInboxItems(), TestContext.Current.CancellationToken);
-            open.ShouldContain(received.Id.Value);
-            open.ShouldContain(failed.Id.Value);
-            open.ShouldNotContain(ignored.Id.Value);
+            var ids = open.Select(item => item.ItemId).ToList();
+            ids.ShouldContain(received.Id.Value);
+            ids.ShouldContain(failed.Id.Value);
+            ids.ShouldNotContain(ignored.Id.Value);
+            open.Single(item => item.ItemId == failed.Id.Value).Status.ShouldBe("Failed");
         }
     }
 }

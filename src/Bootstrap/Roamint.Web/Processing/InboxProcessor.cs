@@ -15,8 +15,8 @@ namespace Roamint.Web.Processing;
 /// <item>The line is resolved against the learned item vocabulary (exact, 0021). It auto-records only when nothing
 /// is guessed: a learned match (so the category is known), a positive amount, a supported currency, and no
 /// same-day twin (0022). Then the item is linked and the bot reacts 👍 and replies with what it understood.</item>
-/// <item>Anything else becomes a reviewable row in the job bar and the bot reacts ✍; confirming it on the form
-/// records, links and flips the reaction.</item>
+/// <item>Anything else stays parsed for review on the inbox page (0026) and the bot reacts ✍; confirming it on the
+/// form records, links and flips the reaction.</item>
 /// </list>
 /// Re-running on an already-parsed item re-evaluates it, so a startup sweep can auto-record items whose description
 /// was learned since. Feedback is best-effort: a Telegram failure never undoes a recorded expense.
@@ -26,7 +26,6 @@ public sealed partial class InboxProcessor(
     IExpensesApi expenses,
     IExpensesQueries queries,
     Household household,
-    ReceiptJobs jobs,
     ILogger<InboxProcessor> logger)
 {
     // The transactable currencies (the add form's set); IRT is display-only.
@@ -83,7 +82,7 @@ public sealed partial class InboxProcessor(
         }
 
         var line = draft.Lines[0];
-        var date = draft.Date ?? DateOnly.FromDateTime(item.SentOnUtc.UtcDateTime);
+        var date = InboxReviewSeed.DateOf(draft, item.SentOnUtc);
         var match = string.IsNullOrWhiteSpace(line.SourceText) ? null : await queries.MatchItemAsync(line.SourceText, ct);
 
         if (match is not null
@@ -95,14 +94,7 @@ public sealed partial class InboxProcessor(
             return;
         }
 
-        var seed = new CaptureSeed(
-            CaptureSource.Inbox,
-            itemId,
-            draft.CurrencyCode,
-            date,
-            [new CaptureLineSeed(line.SourceText, match?.CanonicalDescription ?? line.Description, line.Amount, match?.CategoryId, match?.Unit)],
-            member.Key);
-        jobs.AddReady(itemId, seed, match?.CanonicalDescription ?? line.Description, line.Amount);
+        // Left parsed: the inbox page lists it for review.
         await ReactAsync(itemId, InboxReactionKind.NeedsReview, ct);
     }
 

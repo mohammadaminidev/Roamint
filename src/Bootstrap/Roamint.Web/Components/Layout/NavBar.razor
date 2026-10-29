@@ -1,5 +1,7 @@
 @* Bottom navigation shared across the mobile screens. The centre + opens a capture-method sheet. *@
+@using Roamint.Receipts.Contracts
 @inject NavigationManager Nav
+@inject IServiceScopeFactory Scopes
 
 @* Sheet + scrim stay mounted and animate via a toggled class, so they slide both in and out. *@
 <div class="sheet-scrim @(sheetOpen ? "is-open" : null)" @onclick="CloseSheet" aria-hidden="@(!sheetOpen)"></div>
@@ -21,6 +23,15 @@
         <span class="opt-text">
             <span class="opt-title">Paste an order</span>
             <span class="opt-sub">Import Yerevan City JSON</span>
+        </span>
+        <i class="ti ti-chevron-right opt-chev" aria-hidden="true"></i>
+    </button>
+
+    <button type="button" class="sheet-opt" tabindex="@SheetTabIndex" @onclick='() => Go("inbox")'>
+        <span class="opt-ic"><i class="ti ti-brand-telegram" aria-hidden="true"></i></span>
+        <span class="opt-text">
+            <span class="opt-title">Telegram inbox</span>
+            <span class="opt-sub">@(inboxOpen == 0 ? "Nothing to review" : $"{inboxOpen} to review")</span>
         </span>
         <i class="ti ti-chevron-right opt-chev" aria-hidden="true"></i>
     </button>
@@ -63,11 +74,23 @@
 
 @code {
     private bool sheetOpen;
+    private int inboxOpen;
 
     // The sheet stays in the DOM (so it can animate closed); keep its buttons out of the tab order while hidden.
     private string? SheetTabIndex => sheetOpen ? null : "-1";
 
-    private void ToggleSheet() => sheetOpen = !sheetOpen;
+    // The inbox count is read when the sheet opens, not kept live: the sheet is only seen for a moment. Its own
+    // scope, since the page underneath may be using the circuit's DbContext.
+    private async Task ToggleSheet()
+    {
+        sheetOpen = !sheetOpen;
+        if (sheetOpen)
+        {
+            await using var scope = Scopes.CreateAsyncScope();
+            var open = await scope.ServiceProvider.GetRequiredService<IInboxApi>().ListOpenAsync();
+            inboxOpen = open.Count(item => item.Status is "Parsed" or "Failed");
+        }
+    }
 
     private void CloseSheet() => sheetOpen = false;
 

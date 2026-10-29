@@ -1,0 +1,261 @@
+@page "/inbox"
+@using System.Globalization
+@using Microsoft.Extensions.Options
+@using Roamint.Expenses.Contracts
+@using Roamint.Receipts.Contracts
+@using Roamint.Web.Capture
+@using Roamint.Web.Processing
+@using Roamint.Web.Services
+@implements IDisposable
+@inject IInboxApi InboxApi
+@inject IExpensesQueries Queries
+@inject Household Household
+@inject InboxBacklog Backlog
+@inject InboxBoard Board
+@inject CaptureHandoff Handoff
+@inject IOptions<InboxRelayOptions> RelayOptions
+@inject NavigationManager Nav
+
+<PageTitle>Telegram inbox · Roamint</PageTitle>
+
+<div class="phone">
+    <header>
+        <div class="brand">
+            <span class="dot"></span> Telegram inbox
+            <button type="button" class="check" disabled="@checking" @onclick="CheckNowAsync">
+                <i class="ti ti-refresh @(checking ? "spin" : null)" aria-hidden="true"></i>
+                @(checking ? "Checking…" : "Check now")
+            </button>
+        </div>
+    </header>
+
+    @if (!RelayOptions.Value.IsConfigured)
+    {
+        <p class="hint pad">The relay isn't configured, so no new messages arrive. Set <code>InboxRelay:BaseUrl</code>
+            and <code>InboxRelay:ApiKey</code> in user-secrets.</p>
+    }
+
+    <div class="feed">
+        @if (items is null)
+        {
+            <p class="hint">Loading…</p>
+        }
+        else if (items.Count == 0)
+        {
+            <div class="empty">
+                <i class="ti ti-inbox" aria-hidden="true"></i>
+                <p>Nothing to review.</p>
+                <p class="hint">Messages from the Telegram group show up here when they need you.</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var item in items)
+            {
+                var busy = busyIds.Contains(item.ItemId);
+                <div class="msg">
+                    <div class="msg-head">
+                        <span class="who">@SenderName(item)</span>
+                        <span class="when">@SentLabel(item.SentOnUtc)</span>
+                        <span class="pill @PillClass(item.Status)">@PillLabel(item.Status, busy)</span>
+                    </div>
+
+                    <p class="text" dir="auto">@item.Text</p>
+
+                    @if (item.Status == "Parsed" && item.Draft is { Lines.Count: 1 } draft)
+                    {
+                        <div class="read" dir="auto">
+                            <i class="ti ti-sparkles" aria-hidden="true"></i>
+                            <span>@DraftSummary(draft)</span>
+                        </div>
+                    }
+
+                    @if (item.Status is "Parsed" or "Failed")
+                    {
+                        <div class="actions">
+                            @if (item.Status == "Parsed")
+                            {
+                                <button type="button" class="primary" disabled="@busy" @onclick="() => ReviewAsync(item)">Review</button>
+                            }
+                            else
+                            {
+                                <button type="button" class="primary" disabled="@busy" @onclick="() => RetryAsync(item)">Retry</button>
+                            }
+                            <button type="button" class="ghost" disabled="@busy" @onclick="() => DismissAsync(item)">Dismiss</button>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+        @if (error is not null)
+        {
+            <p class="error">@error</p>
+        }
+    </div>
+
+    <NavBar />
+</div>
+
+@code {
+    // The household lives in Armenia (UTC+4, no DST); show message times on the Yerevan clock.
+    private static readonly TimeZoneInfo Yerevan = TimeZoneInfo.FindSystemTimeZoneById("Asia/Yerevan");
+
+    // Board.Changed reloads can land while a Dismiss or Review is awaiting the circuit's DbContext; one at a time.
+    private readonly SemaphoreSlim gate = new(1, 1);
+    private IReadOnlyList<InboxItemDto>? items;
+    private readonly HashSet<Guid> busyIds = [];
+    private bool checking;
+    private string? error;
+    private Action? onChanged;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The worker raises Changed on a background thread; marshal the reload onto this circuit.
+        onChanged = () => _ = InvokeAsync(async () =>
+        {
+            await ReloadAsync();
+            StateHasChanged();
+        });
+        Board.Changed += onChanged;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        await gate.WaitAsync();
+        try
+        {
+            items = await InboxApi.ListOpenAsync();
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        // A retried item is busy until it leaves Failed (back to Parsed, or settled and gone).
+        busyIds.RemoveWhere(id => items.All(item => item.ItemId != id || item.Status != "Failed"));
+    }
+
+    // Wakes the puller (the relay is only ever drained there); new messages arrive through Board.Changed. The
+    // second reload covers a pull that found nothing new, which raises no change.
+    private async Task CheckNowAsync()
+    {
+        checking = true;
+        Backlog.RequestPull();
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        await ReloadAsync();
+        checking = false;
+    }
+
+    private async Task ReviewAsync(InboxItemDto item)
+    {
+        var payer = Household.FindByTelegramUser(item.SenderExternalId)?.Key;
+        CaptureSeed? seed;
+        await gate.WaitAsync();
+        try
+        {
+            seed = await InboxReviewSeed.BuildAsync(item, payer, Queries, CancellationToken.None);
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        if (seed is null)
+        {
+            return;
+        }
+
+        Handoff.Set(seed);
+        Nav.NavigateTo($"/add?review={item.ItemId}");
+    }
+
+    private async Task RetryAsync(InboxItemDto item)
+    {
+        busyIds.Add(item.ItemId);
+        await Backlog.EnqueueAsync(item.ItemId, CancellationToken.None);
+    }
+
+    private async Task DismissAsync(InboxItemDto item)
+    {
+        error = null;
+        busyIds.Add(item.ItemId);
+        await gate.WaitAsync();
+        try
+        {
+            await InboxApi.IgnoreAsync(item.ItemId);
+            await ClearReactionAsync(item.ItemId);
+        }
+        catch (Roamint.SharedKernel.DomainException ex)
+        {
+            // E.g. recorded from another tab meanwhile.
+            error = ex.Message;
+        }
+        finally
+        {
+            gate.Release();
+        }
+
+        busyIds.Remove(item.ItemId);
+        Board.Raise();
+    }
+
+    // Best-effort, like the worker's feedback: a Telegram hiccup must not undo the dismissal.
+    private async Task ClearReactionAsync(Guid itemId)
+    {
+        try
+        {
+            await InboxApi.ReactAsync(itemId, InboxReactionKind.None);
+        }
+        catch (HttpRequestException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private string SenderName(InboxItemDto item)
+    {
+        var member = Household.FindByTelegramUser(item.SenderExternalId);
+        return member is null ? "Unknown sender"
+            : string.IsNullOrWhiteSpace(member.DisplayName) ? member.Key : member.DisplayName;
+    }
+
+    private static string SentLabel(DateTimeOffset sentOnUtc) =>
+        TimeZoneInfo.ConvertTime(sentOnUtc, Yerevan).ToString("ddd d MMM, HH:mm", CultureInfo.InvariantCulture);
+
+    private static string PillClass(string status) => status switch
+    {
+        "Parsed" => "review",
+        "Failed" => "failed",
+        _ => "reading",
+    };
+
+    private static string PillLabel(string status, bool busy) => status switch
+    {
+        "Parsed" => "To review",
+        "Failed" => busy ? "Retrying…" : "Couldn't read",
+        _ => "Reading…",
+    };
+
+    private static string DraftSummary(ParsedDraftDto draft)
+    {
+        var line = draft.Lines[0];
+        var amount = line.Amount > 0m
+            ? line.Amount.ToString(draft.CurrencyCode == "AMD" ? "N0" : "N2", CultureInfo.InvariantCulture)
+            : "amount?";
+        return $"{amount} {draft.CurrencyCode ?? "currency?"} · {line.Description}";
+    }
+
+    public void Dispose()
+    {
+        if (onChanged is not null)
+        {
+            Board.Changed -= onChanged;
+        }
+
+        gate.Dispose();
+    }
+}

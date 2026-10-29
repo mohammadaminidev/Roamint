@@ -53,6 +53,7 @@ builder.Services.AddHttpClient<InboxRelayClient>(http =>
     }
 });
 builder.Services.AddSingleton<InboxBacklog>();
+builder.Services.AddSingleton<InboxBoard>();
 builder.Services.AddScoped<InboxProcessor>();
 builder.Services.AddHostedService<InboxPuller>();
 builder.Services.AddHostedService<InboxProcessingWorker>();

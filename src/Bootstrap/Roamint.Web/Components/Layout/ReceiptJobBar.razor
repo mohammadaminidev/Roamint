@@ -1,35 +1,44 @@
 @using System.Globalization
+@using Roamint.Receipts.Contracts
 @using Roamint.Web.Capture
 @using Roamint.Web.Processing
 @implements IDisposable
 @inject ReceiptJobs Jobs
+@inject InboxBoard Board
+@inject IServiceScopeFactory Scopes
 @inject CaptureHandoff Handoff
 @inject NavigationManager Nav
 
 @{
     var jobs = Jobs.Snapshot();
+    var showInbox = toReview > 0 && !OnInboxPage;
 }
-@if (jobs.Count > 0)
+@if (jobs.Count > 0 || showInbox)
 {
     <div class="job-bar">
+        @* Telegram messages (0026): one summary row, never one per message — the inbox page is the durable list. *@
+        @if (showInbox)
+        {
+            <div class="job is-ready">
+                <div class="job-main">
+                    <i class="ti ti-brand-telegram job-ic" aria-hidden="true"></i>
+                    <div class="job-text">
+                        <span class="job-title">@toReview Telegram message@(toReview == 1 ? "" : "s") to review</span>
+                    </div>
+                </div>
+                <button type="button" class="job-review" @onclick='() => Nav.NavigateTo("/inbox")'>Open</button>
+            </div>
+        }
         @foreach (var job in jobs)
         {
             <div class="job @StageClass(job.Stage)">
                 @if (job.Stage == ReceiptJobStage.Ready)
                 {
-                    var fromTelegram = job.Seed?.Source == CaptureSource.Inbox;
                     <div class="job-main">
-                        <i class="ti @(fromTelegram ? "ti-brand-telegram" : "ti-receipt") job-ic" aria-hidden="true"></i>
+                        <i class="ti ti-receipt job-ic" aria-hidden="true"></i>
                         <div class="job-text">
                             <span class="job-title">@(string.IsNullOrWhiteSpace(job.Merchant) ? "Receipt ready" : job.Merchant)</span>
-                            @if (fromTelegram)
-                            {
-                                <span class="job-sub">@FormatTotal(job) · from Telegram</span>
-                            }
-                            else
-                            {
-                                <span class="job-sub">@FormatTotal(job) · @job.ItemCount item@(job.ItemCount == 1 ? "" : "s")</span>
-                            }
+                            <span class="job-sub">@FormatTotal(job) · @job.ItemCount item@(job.ItemCount == 1 ? "" : "s")</span>
                         </div>
                     </div>
                     <button type="button" class="job-review" @onclick="() => Review(job)">Review</button>
@@ -63,13 +72,39 @@
 
 @code {
     private Action? _onChanged;
+    private Action? _onInboxChanged;
+    private int toReview;
 
-    protected override void OnInitialized()
+    // The summary row would only point at the page you're on.
+    private bool OnInboxPage => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("inbox", StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
     {
-        // The worker raises Changed on a background thread; marshal the re-render onto this circuit.
+        // The workers raise Changed on a background thread; marshal the re-render onto this circuit.
         _onChanged = () => InvokeAsync(StateHasChanged);
         Jobs.Changed += _onChanged;
+
+        _onInboxChanged = () => _ = InvokeAsync(async () =>
+        {
+            await CountInboxAsync();
+            StateHasChanged();
+        });
+        Board.Changed += _onInboxChanged;
+        Nav.LocationChanged += OnLocationChanged;
+        await CountInboxAsync();
     }
+
+    // Messages that need a person: to review, or couldn't be read. Ones still being read aren't counted. Its own
+    // scope: the bar lives beside every page, and the circuit's DbContext can't serve both at once.
+    private async Task CountInboxAsync()
+    {
+        await using var scope = Scopes.CreateAsyncScope();
+        var open = await scope.ServiceProvider.GetRequiredService<IInboxApi>().ListOpenAsync();
+        toReview = open.Count(item => item.Status is "Parsed" or "Failed");
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) =>
+        _ = InvokeAsync(StateHasChanged);
 
     private void Review(ReceiptJob job)
     {
@@ -111,5 +146,12 @@
         {
             Jobs.Changed -= _onChanged;
         }
+
+        if (_onInboxChanged is not null)
+        {
+            Board.Changed -= _onInboxChanged;
+        }
+
+        Nav.LocationChanged -= OnLocationChanged;
     }
 }

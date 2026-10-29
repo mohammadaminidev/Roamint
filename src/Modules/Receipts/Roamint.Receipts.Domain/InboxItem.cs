@@ -108,9 +108,15 @@ public sealed class InboxItem : AggregateRoot<InboxItemId>
         Status = InboxItemStatus.Parsed;
     }
 
+    /// <summary>Not to be recorded: an unknown sender or chatter while reading, or dismissed from review by the
+    /// user (0026, e.g. already entered by hand). Only a linked item is final.</summary>
     public void Ignore()
     {
-        RequireReadable("ignore");
+        if (Status is not (InboxItemStatus.Received or InboxItemStatus.Failed or InboxItemStatus.Parsed))
+        {
+            throw new DomainException($"Cannot ignore an inbox item in status {Status}.");
+        }
+
         Status = InboxItemStatus.Ignored;
     }
 
@@ -137,7 +143,7 @@ public sealed class InboxItem : AggregateRoot<InboxItemId>
         Raise(new InboxItemLinked(Id, expenseId));
     }
 
-    // Reading (parse / ignore / fail) happens on a fresh item or retries a failed one.
+    // Reading (parse / fail) happens on a fresh item or retries a failed one.
     private void RequireReadable(string action)
     {
         if (Status is not (InboxItemStatus.Received or InboxItemStatus.Failed))

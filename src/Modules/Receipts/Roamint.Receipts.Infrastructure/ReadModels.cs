@@ -66,11 +66,31 @@ internal sealed class GetInboxItemHandler(ReceiptsDbContext db) : IQueryHandler<
     public async Task<InboxItemView?> HandleAsync(GetInboxItem query, CancellationToken ct)
     {
         var item = await db.InboxItems.AsNoTracking().FirstOrDefaultAsync(i => i.Id == query.ItemId, ct);
-        if (item is null)
-        {
-            return null;
-        }
+        return item is null ? null : InboxItemViews.From(item);
+    }
+}
 
+/// <summary>Unsettled inbox items (received, parsed-awaiting-review, failed), oldest first: the inbox page (0026)
+/// and the host's startup sweep (0024). Materialized, since the draft is a converted jsonb column.</summary>
+internal sealed class ListOpenInboxItemsHandler(ReceiptsDbContext db)
+    : IQueryHandler<ListOpenInboxItems, IReadOnlyList<InboxItemView>>
+{
+    public async Task<IReadOnlyList<InboxItemView>> HandleAsync(ListOpenInboxItems query, CancellationToken ct)
+    {
+        var items = await db.InboxItems.AsNoTracking()
+            .Where(item => item.Status == InboxItemStatus.Received
+                || item.Status == InboxItemStatus.Parsed
+                || item.Status == InboxItemStatus.Failed)
+            .OrderBy(item => item.SentOnUtc)
+            .ToListAsync(ct);
+        return items.Select(InboxItemViews.From).ToList();
+    }
+}
+
+internal static class InboxItemViews
+{
+    public static InboxItemView From(InboxItem item)
+    {
         var draft = item.Draft is null
             ? null
             : new DraftView(
@@ -92,18 +112,4 @@ internal sealed class GetInboxItemHandler(ReceiptsDbContext db) : IQueryHandler<
             item.LinkedExpenseId,
             draft);
     }
-}
-
-/// <summary>Ids of unsettled inbox items (received, parsed-awaiting-review, failed), oldest first, for the host's
-/// startup sweep (0024).</summary>
-internal sealed class ListOpenInboxItemsHandler(ReceiptsDbContext db) : IQueryHandler<ListOpenInboxItems, IReadOnlyList<Guid>>
-{
-    public async Task<IReadOnlyList<Guid>> HandleAsync(ListOpenInboxItems query, CancellationToken ct) =>
-        await db.InboxItems.AsNoTracking()
-            .Where(item => item.Status == InboxItemStatus.Received
-                || item.Status == InboxItemStatus.Parsed
-                || item.Status == InboxItemStatus.Failed)
-            .OrderBy(item => item.SentOnUtc)
-            .Select(item => item.Id.Value)
-            .ToListAsync(ct);
 }

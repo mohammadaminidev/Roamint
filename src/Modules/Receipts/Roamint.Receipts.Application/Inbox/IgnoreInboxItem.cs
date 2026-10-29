@@ -3,8 +3,9 @@ using Roamint.Receipts.Domain;
 
 namespace Roamint.Receipts.Application.Inbox;
 
-/// <summary>Marks an inbox item as not for Roamint without reading it — the host does this for a sender who
-/// isn't a household member, before spending an extractor call on the message.</summary>
+/// <summary>Marks an inbox item as not to be recorded — the host does this for a sender who isn't a household
+/// member (before spending an extractor call on the message), and the user does it by dismissing a message from
+/// review (0026).</summary>
 public sealed record IgnoreInboxItem(InboxItemId ItemId) : ICommand;
 
 internal sealed class IgnoreInboxItemHandler(
