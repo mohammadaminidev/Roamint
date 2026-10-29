@@ -69,6 +69,13 @@ internal sealed class ExpensesQueries(IQueryDispatcher queries) : IExpensesQueri
             .ToList();
     }
 
+    public async Task<IReadOnlyList<PayerSpendItem>> GetPayerSummaryAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        var buckets = await queries.QueryAsync(new GetPayerSummary(fromDate, toDate), ct);
+        return buckets.Select(bucket => new PayerSpendItem(bucket.PaidBy, bucket.CurrencyCode, bucket.Total)).ToList();
+    }
+
     public Task<int> CountSameDayMatchesAsync(
         DateOnly occurredOn, string currencyCode, decimal total, CancellationToken ct = default) =>
         queries.QueryAsync(new CountSameDayMatches(occurredOn, currencyCode, total), ct);

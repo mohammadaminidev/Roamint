@@ -5,11 +5,14 @@
 @using Roamint.Receipts.Contracts
 @using Roamint.SharedKernel
 @using Roamint.Web.Capture
+@using Roamint.Web.Services
 @implements IDisposable
 @inject IExpensesApi Api
 @inject IExpensesQueries Queries
 @inject IReceiptsApi ReceiptsApi
 @inject IImportsApi ImportsApi
+@inject IInboxApi InboxApi
+@inject Household Household
 @inject CaptureHandoff Handoff
 @inject TimeProvider Clock
 
@@ -169,6 +172,20 @@
             <input type="text" placeholder="Lunch near the office" value="@noteText" @oninput="OnNoteInput" />
         </div>
 
+        @if (Household.Members.Count > 0)
+        {
+            <div class="field">
+                <label>Paid by</label>
+                <div class="seg payer-seg">
+                    @foreach (var member in Household.Members)
+                    {
+                        <button type="button" class="@(member.Key == paidBy ? "active" : null)"
+                                @onclick="() => TogglePayer(member.Key)">@Household.DisplayNameFor(member.Key)</button>
+                    }
+                </div>
+            </div>
+        }
+
         @if (error is not null)
         {
             <p class="error">@error</p>
@@ -243,9 +260,17 @@
     private string newTagText = string.Empty;
     private bool newTagGlobal;
     private string currencyCode = "AMD";
+    // Set by the job bar's Review link; only its change matters (see OnParametersSetAsync).
+    [SupplyParameterFromQuery(Name = "review")]
+    public Guid? ReviewId { get; set; }
+
     private DateOnly date;
     private DateOnly today;
     private string noteText = string.Empty;
+
+    // The paying household member's key (0024), or null = unattributed. Kept across saves: the same person
+    // usually logs several expenses in a row.
+    private string? paidBy;
     private readonly List<LineRow> lines = [];
     private int? expandedCatLine;
     private bool submitting;
@@ -260,9 +285,12 @@
     // Set when reviewing a handed-off capture: which source to link back to on confirm, and its id.
     private (CaptureSource Source, Guid Id)? linkTarget;
 
-    private string ReviewHint => linkTarget?.Source == CaptureSource.ImportedOrder
-        ? "Reviewing a pasted order"
-        : "Reviewing a scanned receipt";
+    private string ReviewHint => linkTarget?.Source switch
+    {
+        CaptureSource.ImportedOrder => "Reviewing a pasted order",
+        CaptureSource.Inbox => "Reviewing a Telegram message",
+        _ => "Reviewing a scanned receipt",
+    };
 
     private string? activeSuggestKey;
     private IReadOnlyList<ItemSuggestion> suggestions = [];
@@ -281,6 +309,32 @@
         lines.Add(NewLine());
 
         // If we arrived from a scanned receipt or a pasted order, seed the form from its draft and suggest categories.
+        await ReviewPendingCaptureAsync();
+    }
+
+    // Review tapped in the job bar while this page is already open: Blazor reuses the component, so
+    // OnInitializedAsync doesn't re-run. The bar's ?review=<id> changes a parameter, which lands here instead.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (categories is null || !Handoff.HasPending)
+        {
+            return;
+        }
+
+        error = null;
+        success = null;
+        noteText = string.Empty;
+        date = today;
+        lines.Clear();
+        lines.Add(NewLine());
+        expandedCatLine = null;
+        expandedTagLine = null;
+        ResetDuplicateGuard();
+        await ReviewPendingCaptureAsync();
+    }
+
+    private async Task ReviewPendingCaptureAsync()
+    {
         if (ApplyCaptureHandoff())
         {
             for (var i = 0; i < lines.Count; i++)
@@ -303,6 +357,11 @@
         var seed = Handoff.Pending!;
         Handoff.Clear();
         linkTarget = (seed.Source, seed.SourceId);
+
+        if (seed.PaidBy is { } payer && Household.Members.Any(member => member.Key == payer))
+        {
+            paidBy = payer;
+        }
 
         if (seed.CurrencyCode is { Length: > 0 } code && Currencies.Any(currency => currency.Code == code))
         {
@@ -551,6 +610,27 @@
         return sum;
     }
 
+    // ---- Payer ----
+
+    private void TogglePayer(string key) => paidBy = paidBy == key ? null : key;
+
+    // Flips the Telegram message's ✍ to 👍 (0024). Best-effort: the expense is already recorded and linked.
+    [SuppressMessage(
+        "Design",
+        "CA1031:Do not catch general exception types",
+        Justification = "Telegram feedback is best-effort; a failed reaction must not surface as a save error.")]
+    private async Task MarkInboxRecordedAsync(Guid itemId)
+    {
+        try
+        {
+            await InboxApi.ReactAsync(itemId, InboxReactionKind.Recorded);
+        }
+        catch (Exception)
+        {
+            // Swallow — see attribute.
+        }
+    }
+
     // ---- Note ----
 
     private void OnNoteInput(ChangeEventArgs e) => noteText = e.Value?.ToString() ?? string.Empty;
@@ -698,7 +778,7 @@
         try
         {
             var note = string.IsNullOrWhiteSpace(noteText) ? null : noteText.Trim();
-            var expenseId = await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note));
+            var expenseId = await Api.RecordExpenseAsync(new RecordExpenseRequest(currencyCode, date, dtos, note, paidBy));
 
             // If this expense came from a capture, link the source to the expense (host orchestration — 0015/
             // 0017) and learn each line's mapping so the next capture resolves it automatically (0016).
@@ -711,6 +791,10 @@
                         break;
                     case CaptureSource.ImportedOrder:
                         await ImportsApi.LinkAsync(sourceId, expenseId);
+                        break;
+                    case CaptureSource.Inbox:
+                        await InboxApi.LinkAsync(sourceId, expenseId);
+                        await MarkInboxRecordedAsync(sourceId);
                         break;
                 }
 

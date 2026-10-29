@@ -45,6 +45,31 @@ internal sealed class ImportedOrderRepository(ReceiptsDbContext db) : IImportedO
     }
 }
 
+internal sealed class InboxItemRepository(ReceiptsDbContext db) : IInboxItemRepository
+{
+    public Task<InboxItem?> GetAsync(InboxItemId id, CancellationToken ct)
+    {
+        // Same stale-copy hazard as ReceiptRepository: the review form's circuit-scoped context may still track
+        // this item from an earlier read while the background worker advanced it. Read committed state.
+        var tracked = db.ChangeTracker.Entries<InboxItem>().FirstOrDefault(entry => entry.Entity.Id == id);
+        if (tracked is not null)
+        {
+            tracked.State = EntityState.Detached;
+        }
+
+        return db.InboxItems.FirstOrDefaultAsync(item => item.Id == id, ct);
+    }
+
+    public Task<InboxItem?> FindAsync(string source, string externalId, CancellationToken ct) =>
+        db.InboxItems.FirstOrDefaultAsync(item => item.Source == source && item.ExternalId == externalId, ct);
+
+    public Task AddAsync(InboxItem item, CancellationToken ct)
+    {
+        db.InboxItems.Add(item);
+        return Task.CompletedTask;
+    }
+}
+
 internal sealed class UnitOfWork(ReceiptsDbContext db) : IUnitOfWork
 {
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);

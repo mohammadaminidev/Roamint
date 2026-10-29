@@ -6,6 +6,7 @@
 @using Roamint.Web.Services
 @inject IExpensesQueries Expenses
 @inject IWalletQueries Wallet
+@inject Household Household
 @inject TimeProvider Clock
 @inject NavigationManager Nav
 
@@ -80,6 +81,21 @@
                     <div class="val @(row.Current == 0m ? "gone" : null)">@Format(row.Current)</div>
                 </div>
             }
+
+            @if (payerRows.Count > 0)
+            {
+                <div class="seg-label payer-label">Paid by</div>
+                @foreach (var payer in payerRows)
+                {
+                    <div class="cat">
+                        <div class="icon"><i class="ti @(payer.Key is null ? "ti-help" : "ti-user")" aria-hidden="true"></i></div>
+                        <div class="meta">
+                            <div class="t">@Household.DisplayNameFor(payer.Key)</div>
+                        </div>
+                        <div class="val">@Format(payer.Total)</div>
+                    </div>
+                }
+            }
         }
     </div>
 
@@ -118,6 +134,8 @@
     private RateConverter converter = new(Array.Empty<CurrentRateDto>());
     private IReadOnlyList<CategorySpendItem> current = [];
     private IReadOnlyList<CategorySpendItem> prior = [];
+    private IReadOnlyList<PayerSpendItem> payers = [];
+    private IReadOnlyList<PayerRow> payerRows = [];
 
     private IReadOnlyList<Row>? rows;
     private decimal grandTotal;
@@ -143,6 +161,7 @@
 
         current = await Expenses.GetMonthlySummaryAsync(curFrom, curTo);
         prior = await Expenses.GetMonthlySummaryAsync(priorFrom, priorTo);
+        payers = await Expenses.GetPayerSummaryAsync(curFrom, curTo);
         Recompute();
     }
 
@@ -209,6 +228,31 @@
             .ToList();
 
         grandTotal = rows.Sum(row => row.Current);
+        payerRows = FoldPayers(target);
+    }
+
+    // The "who paid" breakdown (0024), in the same denomination. Shown only once someone is attributed — a
+    // month of all-unattributed expenses would just repeat the total. Payer currencies are a subset of the
+    // month's currencies, which Recompute has already checked are convertible.
+    private List<PayerRow> FoldPayers(Currency target)
+    {
+        if (payers.All(bucket => bucket.PaidBy is null))
+        {
+            return [];
+        }
+
+        return payers
+            .GroupBy(bucket => bucket.PaidBy)
+            .Select(group => new PayerRow(
+                group.Key,
+                group.Sum(bucket =>
+                {
+                    converter.TryConvert(bucket.Total, Currency.FromCode(bucket.CurrencyCode), target, out var converted);
+                    return converted;
+                })))
+            .OrderBy(row => row.Key is null)
+            .ThenByDescending(row => row.Total)
+            .ToList();
     }
 
     // Every currency converts here (missing ones short-circuit Recompute first), so the out-total is exact.
@@ -260,4 +304,6 @@
     private sealed record Row(string Name, decimal Current, decimal Prior, bool HasPrior);
 
     private sealed record CatAgg(string Name, decimal Total);
+
+    private sealed record PayerRow(string? Key, decimal Total);
 }

@@ -21,7 +21,8 @@ public sealed record RecordExpense(
     string CurrencyCode,
     DateOnly OccurredOn,
     IReadOnlyList<ExpenseLineInput> Lines,
-    string? Note = null) : ICommand<ExpenseId>;
+    string? Note = null,
+    string? PaidBy = null) : ICommand<ExpenseId>;
 
 internal sealed class RecordExpenseHandler(
     IExpenseRepository expenses,
@@ -44,7 +45,8 @@ internal sealed class RecordExpenseHandler(
             command.OccurredOn,
             ExpenseLineBinding.ToDrafts(command.Lines, currency),
             clock,
-            command.Note);
+            command.Note,
+            command.PaidBy);
 
         await expenses.AddAsync(expense, ct);
         await unitOfWork.SaveChangesAsync(ct);

@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored) for `npm run dev`. Fake values are fine locally.
+TELEGRAM_BOT_TOKEN=123456:local-dev-token
+TELEGRAM_WEBHOOK_SECRET=local-webhook-secret
+ALLOWED_CHAT_IDS=-1001234567890
+INBOX_API_KEY=local-inbox-key

@@ -17,11 +17,19 @@
             <div class="job @StageClass(job.Stage)">
                 @if (job.Stage == ReceiptJobStage.Ready)
                 {
+                    var fromTelegram = job.Seed?.Source == CaptureSource.Inbox;
                     <div class="job-main">
-                        <i class="ti ti-receipt job-ic" aria-hidden="true"></i>
+                        <i class="ti @(fromTelegram ? "ti-brand-telegram" : "ti-receipt") job-ic" aria-hidden="true"></i>
                         <div class="job-text">
                             <span class="job-title">@(string.IsNullOrWhiteSpace(job.Merchant) ? "Receipt ready" : job.Merchant)</span>
-                            <span class="job-sub">@FormatTotal(job) · @job.ItemCount item@(job.ItemCount == 1 ? "" : "s")</span>
+                            @if (fromTelegram)
+                            {
+                                <span class="job-sub">@FormatTotal(job) · from Telegram</span>
+                            }
+                            else
+                            {
+                                <span class="job-sub">@FormatTotal(job) · @job.ItemCount item@(job.ItemCount == 1 ? "" : "s")</span>
+                            }
                         </div>
                     </div>
                     <button type="button" class="job-review" @onclick="() => Review(job)">Review</button>
@@ -72,7 +80,8 @@
 
         Handoff.Set(job.Seed);
         Jobs.Dismiss(job.ReceiptId);
-        Nav.NavigateTo("/add");
+        // The id makes the URL differ even when /add is already open, so the form re-reads the handoff.
+        Nav.NavigateTo($"/add?review={job.ReceiptId}");
     }
 
     private static string StageClass(ReceiptJobStage stage) => stage switch

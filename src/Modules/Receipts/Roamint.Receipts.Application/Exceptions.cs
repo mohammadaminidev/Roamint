@@ -22,3 +22,10 @@ public sealed class ImportedOrderNotFoundException(ImportedOrderId id)
 {
     public ImportedOrderId ImportedOrderId { get; } = id;
 }
+
+/// <summary>A referenced <see cref="InboxItem"/> does not exist. Application-layer orchestration outcome.</summary>
+public sealed class InboxItemNotFoundException(InboxItemId id)
+    : DomainException($"Inbox item '{id.Value}' was not found.")
+{
+    public InboxItemId InboxItemId { get; } = id;
+}

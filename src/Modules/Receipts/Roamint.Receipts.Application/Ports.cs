@@ -24,6 +24,53 @@ public interface IImportedOrderRepository
     Task AddAsync(ImportedOrder order, CancellationToken ct);
 }
 
+/// <summary>Write-side access to the <see cref="InboxItem"/> aggregate, plus the dedup lookup the accept handler
+/// uses so a re-drained message is caught before it becomes a second item.</summary>
+public interface IInboxItemRepository
+{
+    Task<InboxItem?> GetAsync(InboxItemId id, CancellationToken ct);
+
+    Task<InboxItem?> FindAsync(string source, string externalId, CancellationToken ct);
+
+    Task AddAsync(InboxItem item, CancellationToken ct);
+}
+
+/// <summary>What the extractor read from one free-text message. Every field is best-effort: the handler
+/// validates and degrades bad values to "needs review" rather than trusting them.</summary>
+public sealed record InboxExtraction(
+    bool IsExpense,
+    decimal? Amount,
+    string? CurrencyCode,
+    string? Description,
+    DateOnly? Date);
+
+/// <summary>Reads a household chat message (Persian free text, 0024) into an <see cref="InboxExtraction"/>.
+/// <paramref name="sentOn"/> is the message's local date, the anchor for relative words like "tonight". The
+/// LLM adapter lives in Infrastructure; failures throw and become a failed item.</summary>
+public interface IInboxExtractor
+{
+    Task<InboxExtraction> ExtractAsync(string text, DateOnly sentOn, CancellationToken ct);
+}
+
+/// <summary>The status an inbox item shows at its source (0024): on Telegram, the bot's reaction on the
+/// message. <see cref="None"/> clears it (chatter).</summary>
+public enum InboxReaction
+{
+    None,
+    Recorded,
+    NeedsReview,
+    Failed,
+}
+
+/// <summary>Feedback to the source an item came from. Telegram in Infrastructure; a no-op when no bot token is
+/// configured. Best-effort by contract — callers must not let a failed notification undo recorded work.</summary>
+public interface IInboxNotifier
+{
+    Task ReactAsync(InboxItem item, InboxReaction reaction, CancellationToken ct);
+
+    Task ReplyAsync(InboxItem item, string text, CancellationToken ct);
+}
+
 /// <summary>What a parser extracts from a recognized payload: the source's own order id (the dedup key) and
 /// the shared review draft.</summary>
 public sealed record ParsedOrder(string ExternalOrderId, ParsedDraft Draft);

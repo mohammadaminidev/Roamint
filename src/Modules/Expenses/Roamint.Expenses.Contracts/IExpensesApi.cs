@@ -59,14 +59,18 @@ public sealed record ExpenseLineDto(
     string? QuantityUnit = null,
     IReadOnlyList<Guid>? TagIds = null);
 
+/// <summary>An expense to record. <see cref="PaidBy"/> is the paying household member's key (0024), or null
+/// when unattributed.</summary>
 public sealed record RecordExpenseRequest(
     string CurrencyCode,
     DateOnly OccurredOn,
     IReadOnlyList<ExpenseLineDto> Lines,
-    string? Note = null);
+    string? Note = null,
+    string? PaidBy = null);
 
 public sealed record CorrectExpenseRequest(
     string CurrencyCode,
     DateOnly OccurredOn,
     IReadOnlyList<ExpenseLineDto> Lines,
-    string? Note = null);
+    string? Note = null,
+    string? PaidBy = null);

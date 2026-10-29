@@ -15,6 +15,11 @@ internal sealed class ImportedOrderIdConverter : ValueConverter<ImportedOrderId,
     public ImportedOrderIdConverter() : base(id => id.Value, value => new ImportedOrderId(value)) { }
 }
 
+internal sealed class InboxItemIdConverter : ValueConverter<InboxItemId, Guid>
+{
+    public InboxItemIdConverter() : base(id => id.Value, value => new InboxItemId(value)) { }
+}
+
 /// <summary>
 /// Persists the OCR <see cref="ParsedDraft"/> as a single <c>jsonb</c> column. The draft is a document we
 /// only ever read back whole (for the review screen), never query inside in SQL, so a converter beats a

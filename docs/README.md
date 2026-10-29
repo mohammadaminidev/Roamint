@@ -37,6 +37,8 @@ Every feature, module, and architectural decision is captured here as a markdown
 | 0020 | [Installable PWA + offline notice](features/0020-installable-pwa.md) |
 | 0021 | [Exact item matching: drop semantic recognition, exact-or-manual](features/0021-uncertain-item-matching.md) |
 | 0022 | [Duplicate-expense guard](features/0022-duplicate-expense-guard.md) |
+| 0023 | [Hosted deployment: tailnet-only VM (deferred; Hetzner when resumed)](features/0023-oracle-deployment.md) |
+| 0024 | [Telegram capture: household group → relay inbox → expense](features/0024-telegram-capture.md) |
 
 Status per feature lives in the root README's roadmap.
 

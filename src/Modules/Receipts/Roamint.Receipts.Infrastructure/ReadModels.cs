@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Roamint.Application.Abstractions;
+using Roamint.Receipts.Application.Inbox;
 using Roamint.Receipts.Application.Receipts;
+using Roamint.Receipts.Domain;
 
 namespace Roamint.Receipts.Infrastructure;
 
@@ -55,4 +57,53 @@ internal sealed class ListPendingReceiptsHandler(ReceiptsDbContext db)
 
         return ids;
     }
+}
+
+/// <summary>Read model for the host's inbox worker (0024). Materializes the item (the draft is a converted jsonb
+/// column) and maps it to the view.</summary>
+internal sealed class GetInboxItemHandler(ReceiptsDbContext db) : IQueryHandler<GetInboxItem, InboxItemView?>
+{
+    public async Task<InboxItemView?> HandleAsync(GetInboxItem query, CancellationToken ct)
+    {
+        var item = await db.InboxItems.AsNoTracking().FirstOrDefaultAsync(i => i.Id == query.ItemId, ct);
+        if (item is null)
+        {
+            return null;
+        }
+
+        var draft = item.Draft is null
+            ? null
+            : new DraftView(
+                item.Draft.Merchant,
+                item.Draft.Date,
+                item.Draft.CurrencyCode,
+                item.Draft.Lines
+                    .Select(line => new DraftLineView(
+                        line.Description, line.Amount, line.QuantityValue, line.QuantityUnit, line.SourceText))
+                    .ToList());
+
+        return new InboxItemView(
+            item.Id.Value,
+            item.Source,
+            item.SenderExternalId,
+            item.Text,
+            item.SentOnUtc,
+            item.Status.ToString(),
+            item.LinkedExpenseId,
+            draft);
+    }
+}
+
+/// <summary>Ids of unsettled inbox items (received, parsed-awaiting-review, failed), oldest first, for the host's
+/// startup sweep (0024).</summary>
+internal sealed class ListOpenInboxItemsHandler(ReceiptsDbContext db) : IQueryHandler<ListOpenInboxItems, IReadOnlyList<Guid>>
+{
+    public async Task<IReadOnlyList<Guid>> HandleAsync(ListOpenInboxItems query, CancellationToken ct) =>
+        await db.InboxItems.AsNoTracking()
+            .Where(item => item.Status == InboxItemStatus.Received
+                || item.Status == InboxItemStatus.Parsed
+                || item.Status == InboxItemStatus.Failed)
+            .OrderBy(item => item.SentOnUtc)
+            .Select(item => item.Id.Value)
+            .ToListAsync(ct);
 }

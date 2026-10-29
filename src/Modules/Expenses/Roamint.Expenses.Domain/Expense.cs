@@ -96,21 +96,30 @@ public sealed class ExpenseLine : Entity<ExpenseLineId>
 /// </summary>
 public sealed class Expense : AggregateRoot<ExpenseId>
 {
+    public const int MaxPaidByLength = 32;
+
     private readonly List<ExpenseLine> _lines = [];
 
     // EF / serialization constructor; not for domain use.
     private Expense(ExpenseId id) : base(id) { }
 
-    private Expense(ExpenseId id, DateOnly occurredOn, string? note, List<ExpenseLine> lines) : base(id)
+    private Expense(ExpenseId id, DateOnly occurredOn, string? note, string? paidBy, List<ExpenseLine> lines)
+        : base(id)
     {
         OccurredOn = occurredOn;
         Note = note;
+        PaidBy = paidBy;
         _lines = lines;
     }
 
     public DateOnly OccurredOn { get; private set; }
 
     public string? Note { get; private set; }
+
+    /// <summary>The household member who paid (their configured key, 0024), or null when unattributed — every
+    /// historical row and any entry made without picking a payer. Membership is validated at the host boundary
+    /// (the form only offers configured members; Telegram maps known senders); the domain guards the shape.</summary>
+    public string? PaidBy { get; private set; }
 
     public IReadOnlyList<ExpenseLine> Lines => _lines.AsReadOnly();
 
@@ -125,14 +134,15 @@ public sealed class Expense : AggregateRoot<ExpenseId>
         DateOnly occurredOn,
         IEnumerable<ExpenseLineDraft> lines,
         TimeProvider clock,
-        string? note = null)
+        string? note = null,
+        string? paidBy = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(lines);
         EnsureNotFuture(occurredOn, clock);
 
         var builtLines = BuildLines(lines, clock);
-        var expense = new Expense(id, occurredOn, Clean(note), builtLines);
+        var expense = new Expense(id, occurredOn, Clean(note), CleanPayer(paidBy), builtLines);
         expense.Raise(new ExpenseRecorded(id, expense.Total, occurredOn));
         return expense;
     }
@@ -141,17 +151,20 @@ public sealed class Expense : AggregateRoot<ExpenseId>
         DateOnly occurredOn,
         IEnumerable<ExpenseLineDraft> lines,
         TimeProvider clock,
-        string? note = null)
+        string? note = null,
+        string? paidBy = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(lines);
         EnsureNotFuture(occurredOn, clock);
 
         var builtLines = BuildLines(lines, clock);
+        var payer = CleanPayer(paidBy);
         _lines.Clear();
         _lines.AddRange(builtLines);
         OccurredOn = occurredOn;
         Note = Clean(note);
+        PaidBy = payer;
         Raise(new ExpenseCorrected(Id, Total, occurredOn));
     }
 
@@ -197,4 +210,15 @@ public sealed class Expense : AggregateRoot<ExpenseId>
     }
 
     private static string? Clean(string? note) => string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+
+    private static string? CleanPayer(string? paidBy)
+    {
+        var payer = Clean(paidBy);
+        if (payer is { Length: > MaxPaidByLength })
+        {
+            throw new DomainException($"Payer must be {MaxPaidByLength} characters or fewer.");
+        }
+
+        return payer;
+    }
 }

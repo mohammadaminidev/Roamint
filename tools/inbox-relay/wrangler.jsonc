@@ -1,0 +1,28 @@
+// Roamint inbox relay — always-on mailbox for inbound messages while the local app is off.
+// See docs/features/0024-telegram-capture.md and README.md here for setup.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "roamint-inbox-relay",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "roamint-inbox",
+			// Not a credential; replace with the id printed by `wrangler d1 create roamint-inbox`.
+			"database_id": "f1994799-73db-42cd-af17-09ea122f979e",
+			"migrations_dir": "migrations"
+		},
+		{
+			"binding": "roamint_inbox",
+			"database_name": "roamint-inbox",
+			"database_id": "f1994799-73db-42cd-af17-09ea122f979e",
+			"remote": true
+		}
+	]
+	// Secrets (wrangler secret put …, or .dev.vars locally):
+	//   TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, ALLOWED_CHAT_IDS, INBOX_API_KEY
+}

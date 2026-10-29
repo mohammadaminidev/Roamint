@@ -39,10 +39,37 @@ public static class ReceiptsPersistence
         builder.Services.AddSingleton<IReceiptImageStore>(new FileSystemReceiptImageStore(imageRoot));
 
         AddOcr(builder);
+        AddInbox(builder);
 
         builder.Services.AddHostedService<ReceiptsMigrationService>();
 
         return builder;
+    }
+
+    // Telegram capture (0024): inbox items, their LLM extractor (the OCR chat client, when configured) and
+    // Telegram feedback (when a bot token is configured).
+    private static void AddInbox(IHostApplicationBuilder builder)
+    {
+        builder.Services.AddScoped<IInboxItemRepository, InboxItemRepository>();
+
+        if (string.IsNullOrWhiteSpace(builder.Configuration["Ocr:ApiKey"]))
+        {
+            builder.Services.AddSingleton<IInboxExtractor, UnconfiguredInboxExtractor>();
+        }
+        else
+        {
+            builder.Services.AddSingleton<IInboxExtractor, ChatClientInboxExtractor>();
+        }
+
+        var botToken = builder.Configuration["Telegram:BotToken"];
+        if (string.IsNullOrWhiteSpace(botToken))
+        {
+            builder.Services.AddSingleton<IInboxNotifier, NoopInboxNotifier>();
+        }
+        else
+        {
+            builder.Services.AddSingleton<IInboxNotifier>(new TelegramInboxNotifier(botToken));
+        }
     }
 
     private static void AddOcr(IHostApplicationBuilder builder)

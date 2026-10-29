@@ -24,6 +24,7 @@ public static class ReceiptsModule
         builder.Services.AddScoped<IReceiptsApi, ReceiptsApi>();
         builder.Services.AddScoped<IReceiptsQueries, ReceiptsQueries>();
         builder.Services.AddScoped<IImportsApi, ImportsApi>();
+        builder.Services.AddScoped<IInboxApi, InboxApi>();
 
         return builder;
     }

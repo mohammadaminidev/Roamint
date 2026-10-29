@@ -158,4 +158,31 @@ public class ExpenseTests
 
         Should.Throw<DomainException>(() => expense.Correct(Today, [], Clock));
     }
+
+    [Fact]
+    public void Record_keeps_a_trimmed_payer_and_treats_blank_as_unattributed()
+    {
+        var lines = new[] { Line("Dinner", 15000m, Currency.Amd) };
+
+        Expense.Record(ExpenseId.New(Clock), Today, lines, Clock, paidBy: "  sara  ").PaidBy.ShouldBe("sara");
+        Expense.Record(ExpenseId.New(Clock), Today, lines, Clock, paidBy: "   ").PaidBy.ShouldBeNull();
+        Expense.Record(ExpenseId.New(Clock), Today, lines, Clock).PaidBy.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Record_rejects_an_over_long_payer() =>
+        Should.Throw<DomainException>(() => Expense.Record(
+            ExpenseId.New(Clock), Today, [Line("Dinner", 15000m, Currency.Amd)], Clock,
+            paidBy: new string('x', Expense.MaxPaidByLength + 1)));
+
+    [Fact]
+    public void Correct_replaces_the_payer()
+    {
+        var lines = new[] { Line("Dinner", 15000m, Currency.Amd) };
+        var expense = Expense.Record(ExpenseId.New(Clock), Today, lines, Clock, paidBy: "sara");
+
+        expense.Correct(Today, lines, Clock, paidBy: "omid");
+
+        expense.PaidBy.ShouldBe("omid");
+    }
 }

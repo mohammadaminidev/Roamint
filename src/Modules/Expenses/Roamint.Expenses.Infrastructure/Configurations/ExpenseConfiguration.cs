@@ -16,6 +16,7 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 
         builder.Property(expense => expense.OccurredOn).HasColumnName("occurred_on").IsRequired();
         builder.Property(expense => expense.Note).HasColumnName("note").HasMaxLength(1000);
+        builder.Property(expense => expense.PaidBy).HasColumnName("paid_by").HasMaxLength(Expense.MaxPaidByLength);
 
         // Currency and Total are derived from the lines; never persisted on the expense.
         builder.Ignore(expense => expense.Currency);

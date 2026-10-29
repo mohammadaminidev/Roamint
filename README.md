@@ -87,6 +87,10 @@ See [`docs/features/`](docs/features) for the per-slice design records (`0001`�
   notification bar instead of blocking the Blazor circuit. See `docs/features/0019`.
 - [x] Installable PWA — home-screen install and an offline notice (not offline-capable).
   See `docs/features/0020`.
+- [ ] Telegram capture — household group chat → Cloudflare relay inbox (Worker + D1, holds
+  messages while the local app is off) → parsed expense with who-paid attribution; the bot
+  reacts 👀/👍/✍ as status. Relay (`tools/inbox-relay`) and Roamint side built and tested;
+  awaiting the first live run with the real bot. See `docs/features/0024`.
 - [ ] Natural-language queries over expenses (**Insights module — planned, not started**;
   no project under `src/Modules/` yet). The feature that motivates the outbox drain.
 - [ ] Spreadsheet export (import landed dev-only in 0013).

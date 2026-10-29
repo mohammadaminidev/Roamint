@@ -69,6 +69,71 @@ namespace Roamint.Receipts.Infrastructure.Migrations
                     b.ToTable("imported_orders", "receipts");
                 });
 
+            modelBuilder.Entity("Roamint.Receipts.Domain.InboxItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Draft")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("draft");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("external_id");
+
+                    b.Property<Guid?>("LinkedExpenseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_expense_id");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset>("ReceivedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_on_utc");
+
+                    b.Property<string>("SenderExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sender_external_id");
+
+                    b.Property<DateTimeOffset>("SentOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_on_utc");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_inbox_items_source_external_id");
+
+                    b.ToTable("inbox_items", "receipts");
+                });
+
             modelBuilder.Entity("Roamint.Receipts.Domain.Receipt", b =>
                 {
                     b.Property<Guid>("Id")

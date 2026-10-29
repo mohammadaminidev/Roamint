@@ -108,6 +108,15 @@ header {
     box-shadow: 0 2px 8px rgba(91, 140, 255, 0.35);
 }
 
+/* Payer picker (0024): full-width, one equal segment per household member; tapping the active one clears it. */
+.payer-seg {
+    display: flex;
+}
+
+.payer-seg button {
+    flex: 1;
+}
+
 .divider {
     height: 1px;
     background: var(--border);

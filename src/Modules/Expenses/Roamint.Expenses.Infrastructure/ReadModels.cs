@@ -314,6 +314,35 @@ internal sealed class GetMonthlySummaryHandler(ExpensesDbContext db)
 }
 
 /// <summary>
+/// Read model for the summary's "who paid" breakdown (0024). Same shape as the category summary: filter by
+/// date, group line amounts by the expense's payer and currency, sum in SQL. Unconverted; the host folds the
+/// currency buckets per payer.
+/// </summary>
+internal sealed class GetPayerSummaryHandler(ExpensesDbContext db)
+    : IQueryHandler<GetPayerSummary, IReadOnlyList<PayerSpendView>>
+{
+    public async Task<IReadOnlyList<PayerSpendView>> HandleAsync(GetPayerSummary query, CancellationToken ct)
+    {
+        var buckets = await db.Expenses
+            .AsNoTracking()
+            .Where(expense => expense.OccurredOn >= query.From && expense.OccurredOn <= query.To)
+            .SelectMany(expense => expense.Lines, (expense, line) => new { expense.PaidBy, line.Amount })
+            .GroupBy(row => new { row.PaidBy, row.Amount.Currency })
+            .Select(group => new
+            {
+                group.Key.PaidBy,
+                group.Key.Currency,
+                Total = group.Sum(row => row.Amount.Amount),
+            })
+            .ToListAsync(ct);
+
+        return buckets
+            .Select(bucket => new PayerSpendView(bucket.PaidBy, bucket.Currency.Code, bucket.Total))
+            .ToList();
+    }
+}
+
+/// <summary>
 /// Counts same-day twins for the duplicate guard (0022): expenses on the queried date whose currency matches
 /// and whose line-derived total equals the target. Currency and Total are <c>Ignore</c>d on the aggregate
 /// (derived from lines), so this aggregates over <c>expense_lines</c> like the monthly summary — filter the

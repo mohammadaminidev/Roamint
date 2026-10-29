@@ -1,11 +1,12 @@
 namespace Roamint.Web.Capture;
 
 /// <summary>Which external source a <see cref="CaptureSeed"/> came from — selects the linker the add-expense
-/// form calls on confirm (a receipt vs. an imported order).</summary>
+/// form calls on confirm (a receipt, an imported order, or a Telegram inbox item, 0024).</summary>
 public enum CaptureSource
 {
     Receipt,
     ImportedOrder,
+    Inbox,
 }
 
 /// <summary>
@@ -28,13 +29,14 @@ public sealed class CaptureHandoff
 }
 
 /// <summary>A source-neutral capture to review. <see cref="Source"/> + <see cref="SourceId"/> are the link
-/// target the add form uses on confirm (receipt vs. imported order).</summary>
+/// target the add form uses on confirm. <see cref="PaidBy"/> pre-selects the payer (a Telegram sender, 0024).</summary>
 public sealed record CaptureSeed(
     CaptureSource Source,
     Guid SourceId,
     string? CurrencyCode,
     DateOnly? Date,
-    IReadOnlyList<CaptureLineSeed> Lines);
+    IReadOnlyList<CaptureLineSeed> Lines,
+    string? PaidBy = null);
 
 /// <summary>One review-form line seeded from a capture. <see cref="SourceText"/> is the original item text
 /// (kept so a confirmed line can be learned as a mapping). <see cref="CategoryId"/> and <see cref="Unit"/> are

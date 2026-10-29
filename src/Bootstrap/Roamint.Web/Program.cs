@@ -6,6 +6,7 @@ using Roamint.Web.Capture;
 using Roamint.Web.Components;
 using Roamint.Web.Import;
 using Roamint.Web.Processing;
+using Roamint.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,24 @@ builder.Services.AddScoped<CaptureHandoff>();
 builder.Services.AddSingleton<ReceiptJobs>();
 builder.Services.AddHostedService<ReceiptProcessingWorker>();
 builder.Services.AddHostedService<ReceiptStartupSweep>();
+
+// Telegram capture (0024): household members (payer picker + sender mapping), the relay client, and the
+// puller → queue → processing worker that settles each drained message.
+builder.Services.Configure<HouseholdOptions>(builder.Configuration.GetSection("Household"));
+builder.Services.AddSingleton<Household>();
+var relayOptions = builder.Configuration.GetSection("InboxRelay").Get<InboxRelayOptions>() ?? new InboxRelayOptions();
+builder.Services.Configure<InboxRelayOptions>(builder.Configuration.GetSection("InboxRelay"));
+builder.Services.AddHttpClient<InboxRelayClient>(http =>
+{
+    if (relayOptions.IsConfigured)
+    {
+        InboxRelayClient.Configure(http, relayOptions);
+    }
+});
+builder.Services.AddSingleton<InboxBacklog>();
+builder.Services.AddScoped<InboxProcessor>();
+builder.Services.AddHostedService<InboxPuller>();
+builder.Services.AddHostedService<InboxProcessingWorker>();
 
 var app = builder.Build();
 

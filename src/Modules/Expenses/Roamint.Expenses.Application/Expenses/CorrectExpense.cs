@@ -9,7 +9,8 @@ public sealed record CorrectExpense(
     string CurrencyCode,
     DateOnly OccurredOn,
     IReadOnlyList<ExpenseLineInput> Lines,
-    string? Note = null) : ICommand;
+    string? Note = null,
+    string? PaidBy = null) : ICommand;
 
 internal sealed class CorrectExpenseHandler(
     IExpenseRepository expenses,
@@ -33,7 +34,8 @@ internal sealed class CorrectExpenseHandler(
             command.OccurredOn,
             ExpenseLineBinding.ToDrafts(command.Lines, currency),
             clock,
-            command.Note);
+            command.Note,
+            command.PaidBy);
 
         await unitOfWork.SaveChangesAsync(ct);
     }

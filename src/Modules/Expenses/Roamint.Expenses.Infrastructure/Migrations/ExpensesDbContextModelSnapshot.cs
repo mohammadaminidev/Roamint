@@ -64,6 +64,11 @@ namespace Roamint.Expenses.Infrastructure.Migrations
                         .HasColumnType("date")
                         .HasColumnName("occurred_on");
 
+                    b.Property<string>("PaidBy")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("paid_by");
+
                     b.HasKey("Id");
 
                     b.ToTable("expenses", "expenses");

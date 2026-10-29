@@ -14,3 +14,8 @@ public sealed record OrderImported(
     ImportedOrderId OrderId, string Source, string ExternalOrderId, DateTimeOffset ImportedOnUtc) : IDomainEvent;
 
 public sealed record ImportedOrderLinked(ImportedOrderId OrderId, Guid ExpenseId) : IDomainEvent;
+
+public sealed record InboxItemReceived(
+    InboxItemId ItemId, string Source, string ExternalId, DateTimeOffset ReceivedOnUtc) : IDomainEvent;
+
+public sealed record InboxItemLinked(InboxItemId ItemId, Guid ExpenseId) : IDomainEvent;

@@ -48,7 +48,8 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
                 request.CurrencyCode,
                 request.OccurredOn,
                 ToLines(request.Lines),
-                request.Note),
+                request.Note,
+                request.PaidBy),
             ct);
         return id.Value;
     }
@@ -62,7 +63,8 @@ internal sealed class ExpensesApi(ICommandDispatcher commands) : IExpensesApi
                 request.CurrencyCode,
                 request.OccurredOn,
                 ToLines(request.Lines),
-                request.Note),
+                request.Note,
+                request.PaidBy),
             ct);
     }
 

@@ -53,6 +53,13 @@ public interface IExpensesQueries
         DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 
     /// <summary>
+    /// Per-(payer, currency) spend sums over an inclusive date range — the summary's "who paid" breakdown
+    /// (0024). A null payer collects unattributed expenses. Unconverted, like <see cref="GetMonthlySummaryAsync"/>.
+    /// </summary>
+    Task<IReadOnlyList<PayerSpendItem>> GetPayerSummaryAsync(
+        DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>
     /// Counts existing expenses on <paramref name="occurredOn"/> in <paramref name="currencyCode"/> whose total
     /// equals <paramref name="total"/> — the duplicate-twin signal used by the add-expense confirmation guard
     /// (0022). Equal-total same-day expenses are legal; a non-zero count just drives a "save anyway?" prompt.
@@ -87,3 +94,7 @@ public sealed record ExpenseListItem(
 /// <summary>One bucket of spend: the total of all line amounts in a single (category × currency) pair over a
 /// date range. Unconverted — the host folds the buckets into a display-currency total per category.</summary>
 public sealed record CategorySpendItem(Guid CategoryId, string CategoryName, string CurrencyCode, decimal Total);
+
+/// <summary>One bucket of spend by payer: the total one household member (key, or null = unattributed) paid in
+/// a single currency over a date range. Unconverted — the host folds the buckets per payer.</summary>
+public sealed record PayerSpendItem(string? PaidBy, string CurrencyCode, decimal Total);
